@@ -1,5 +1,5 @@
 {
-  "name": "polychat-linker-expressjs",
+  "name": "polychat-appservice",
   "private": true,
   "type": "module",
   "scripts": {
