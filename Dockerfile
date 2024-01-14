@@ -9,6 +9,10 @@ RUN npm ci
 FROM oven/bun:1
 
 ENV NODE_ENV production
+ENV PATH_CONFIG /config
+ENV PATH_DATA /data
+ENV HOMESERVER_NAME synapse
+ENV HOMESERVER_URL http://synapse:8008
 
 WORKDIR "/app"
 
