@@ -201,7 +201,7 @@ async function createRooms() {
     const intent = appservice.getIntent('polychat');
     const mainRoomId = await intent.underlyingClient.createRoom({
         name: 'Yoga',
-        room_alias_name: 'irc_inspircd_football-usera',
+        room_alias_name: 'irc_inspircd_#football-usera',
         ...(DEBUG_MXID && {
             invite: [DEBUG_MXID],
         }),
@@ -237,7 +237,7 @@ async function hardcodedFootballCreationForChristian() {
 
     await intent.underlyingClient.createRoom({
         name: 'Football - User A',
-        room_alias_name: 'irc_inspircd_football-usera',
+        room_alias_name: 'irc_inspircd_#football-usera',
         ...(DEBUG_MXID && {
             invite: [DEBUG_MXID],
         }),
@@ -245,7 +245,7 @@ async function hardcodedFootballCreationForChristian() {
 
     await intent.underlyingClient.createRoom({
         name: 'Football - User B',
-        room_alias_name: 'irc_inspircd_football-userb',
+        room_alias_name: 'irc_inspircd_#football-userb',
         ...(DEBUG_MXID && {
             invite: [DEBUG_MXID],
         }),
@@ -274,7 +274,7 @@ async function hardcodedForRetreat() {
 
     channels.set('football', channel);
     for (const username of ['usera', 'userb']) {
-        const roomId = await intent.ensureJoined(`#irc_inspircd_football-${username}:${HOMESERVER_NAME}`);
+        const roomId = await intent.ensureJoined(`#irc_inspircd_#football-${username}:${HOMESERVER_NAME}`);
         if (DEBUG_MXID) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
