@@ -9,11 +9,13 @@ import {
 } from "matrix-bot-sdk";
 
 import * as path from 'node:path';
+import { uniqueId } from "./helper";
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_CONFIG = process.env.PATH_CONFIG || './config';
 const HOMESERVER_NAME = process.env.HOMESERVER_NAME || 'localhost';
 const HOMESERVER_URL = process.env.HOMESERVER_URL || 'http://localhost:8008';
+const DEBUG_MXID = process.env.DEBUG_MXID;
 
 const registration: IAppserviceRegistration = {
     as_token: 'ha',
@@ -42,6 +44,7 @@ const appservice = new Appservice({
 
 
 type SubRoomUser = {
+    localpart: string,
     handOut: Date,
 } & ({
     identity: 'inherit',
@@ -83,6 +86,7 @@ async function handOutSubRoom(channelId: string, network: string): Promise<strin
         throw Error('E_OUT_OF_SUB_ROOMS');
     }
     subRoom.user = {
+        localpart: uniqueId('polychat_'),
         identity: 'inherit',
         handOut: new Date(),
     };
@@ -111,7 +115,7 @@ function findMainRoom(roomId: string): Channel | undefined {
 }
 
 const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any) => {
-    const intent = appservice.getIntent('polychat');
+    const polychatIntent = appservice.getIntent('polychat');
     if (event.sender === `@polychat:${HOMESERVER_NAME}`) {
         // Ignore echo
         return;
@@ -120,28 +124,39 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any
     const handOutRegExp = /^hand out ([a-z]+?) ([a-z]+?)$/;
     const match = event.content.body.match(handOutRegExp);
     if (match) {
-        const intent = appservice.getIntent('polychat');
+        const polychatIntent = appservice.getIntent('polychat');
         try {
             const url = await handOutSubRoom(match[1], match[2]);
-            await intent.sendText(subRoom.roomId, `here you go ${url}`);
+            await polychatIntent.sendText(subRoom.roomId, `here you go ${url}`);
         } catch (error: any) {
-            await intent.sendText(subRoom.roomId, `error ${error.message}`);
+            await polychatIntent.sendText(subRoom.roomId, `error ${error.message}`);
         }
         return;
     }
 
     // commands
     if (event.content.body === '!members') {
-        await intent.sendText(subRoom.roomId, `Members:\n* Anna\n* Bernd`);
+        await polychatIntent.sendText(subRoom.roomId, `Members:\n* Anna\n* Bernd`);
         return;
     }
 
-    intent.sendEvent(channel.mainRoomId, event.content);
+    const user = subRoom.user;
+    if (!user) {
+        await polychatIntent.sendText(subRoom.roomId, 'Internal Error: No user identity set. Did you skip a step?');
+        return;
+    }
+
+    const intent = appservice.getIntent(user.localpart);
+    await intent.sendEvent(channel.mainRoomId, event.content);
 };
 
 const onMessageInMainRoom = async (channel: Channel, event: any) => {
     const intent = appservice.getIntent('polychat');
     for (const subRoom of channel.activeSubRooms) {
+        if (subRoom.user && event.sender === `@${subRoom.user.localpart}:${HOMESERVER_NAME}`) {
+            // Don't send echo
+            continue;
+        }
         intent.sendEvent(subRoom.roomId, event.content);
     }
 };
@@ -171,7 +186,13 @@ await intent.ensureRegistered();
 
 async function createRooms() {
     const intent = appservice.getIntent('polychat');
-    const mainRoomId = await intent.underlyingClient.createRoom();
+    const mainRoomId = await intent.underlyingClient.createRoom({
+        name: 'Yoga',
+        room_alias_name: 'irc_inspircd_football-usera',
+        ...(DEBUG_MXID && {
+            invite: [DEBUG_MXID],
+        }),
+    });
 
     const channel: Channel = {
         name: 'Yoga',
@@ -181,10 +202,15 @@ async function createRooms() {
         activeSubRooms: [],
     };
 
-    channels.set('a', channel);
+    channels.set('yoga', channel);
 
     for (let i = 0; i < 4; i++) {
-        const roomId = await intent.underlyingClient.createRoom();
+        const roomId = await intent.underlyingClient.createRoom({
+            name: 'Yoga',
+            ...(DEBUG_MXID && {
+                invite: [DEBUG_MXID],
+            }),
+        });
         channel.unclaimedSubRooms.push({
             ready: new Date(),
             roomId,
@@ -199,13 +225,17 @@ async function hardcodedFootballCreationForChristian() {
     await intent.underlyingClient.createRoom({
         name: 'Football - User A',
         room_alias_name: 'irc_inspircd_football-usera',
-        invite: [`@jaller94:${HOMESERVER_NAME}`],
+        ...(DEBUG_MXID && {
+            invite: [DEBUG_MXID],
+        }),
     });
 
     await intent.underlyingClient.createRoom({
         name: 'Football - User B',
         room_alias_name: 'irc_inspircd_football-userb',
-        invite: [`@jaller94:${HOMESERVER_NAME}`],
+        ...(DEBUG_MXID && {
+            invite: [DEBUG_MXID],
+        }),
     });
 }
 
@@ -215,7 +245,9 @@ async function hardcodedForRetreat() {
 
     const mainRoomId = await intent.underlyingClient.createRoom({
         name: `Football ${new Date().toISOString()}`,
-        // invite: [`@jaller94:${HOMESERVER_NAME}`],
+        ...(DEBUG_MXID && {
+            invite: [DEBUG_MXID],
+        }),
     });
 
     const channel: Channel = {
@@ -233,6 +265,7 @@ async function hardcodedForRetreat() {
             ready: new Date(),
             roomId,
             user: {
+                localpart: uniqueId('polychat_'),
                 handOut: new Date(),
                 identity: 'inherit',
             },
