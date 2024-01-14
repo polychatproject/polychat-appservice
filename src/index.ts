@@ -201,7 +201,6 @@ async function createRooms() {
     const intent = appservice.getIntent('polychat');
     const mainRoomId = await intent.underlyingClient.createRoom({
         name: 'Yoga',
-        room_alias_name: 'irc_#football-usera',
         ...(DEBUG_MXID && {
             invite: [DEBUG_MXID],
         }),
@@ -220,6 +219,7 @@ async function createRooms() {
     for (let i = 0; i < 4; i++) {
         const roomId = await intent.underlyingClient.createRoom({
             name: 'Yoga',
+            room_alias_name: `irc_#yoga-user${i}`,
             ...(DEBUG_MXID && {
                 invite: [DEBUG_MXID],
             }),
