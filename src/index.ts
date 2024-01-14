@@ -178,6 +178,19 @@ appservice.on("room.message", async (roomId: string, event: any) => {
     console.info(`Didn't know what to do with event in ${roomId}`);
 });
 
+appservice.on("room.event", async (roomId: string, event: any) => {
+    if (event['type'] !== 'm.room.avatar' || event['state_key'] !== '') return;
+
+    const channel = findMainRoom(roomId);
+    if (channel) {
+        console.info(`AVATAR CHANGED ${JSON.stringify(event.content)}`);
+        const intent = appservice.getIntent('polychat');
+        for (const subRoom of channel.activeSubRooms) {
+            await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
+        }
+    }
+});
+
 // Typically appservices will want to autojoin all rooms
 AutojoinRoomsMixin.setupOnAppservice(appservice);
 
@@ -245,10 +258,11 @@ async function hardcodedForRetreat() {
 
     const mainRoomId = await intent.underlyingClient.createRoom({
         name: `Football ${new Date().toISOString()}`,
-        ...(DEBUG_MXID && {
-            invite: [DEBUG_MXID],
-        }),
     });
+    if (DEBUG_MXID) {
+        await intent.underlyingClient.inviteUser(DEBUG_MXID, mainRoomId);
+        await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, mainRoomId, 50);
+    }
 
     const channel: Channel = {
         name: 'Football',
@@ -261,6 +275,10 @@ async function hardcodedForRetreat() {
     channels.set('football', channel);
     for (const username of ['usera', 'userb']) {
         const roomId = await intent.ensureJoined(`#irc_inspircd_football-${username}:${HOMESERVER_NAME}`);
+        if (DEBUG_MXID) {
+            await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
+            await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
+        }
         channel.activeSubRooms.push({
             ready: new Date(),
             roomId,
