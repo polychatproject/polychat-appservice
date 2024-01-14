@@ -47,7 +47,7 @@ type SubRoomUser = {
     identity: 'inherit',
 } | {
     identity: 'custom',
-    name: string,
+    displayName: string,
     avatar: string,
 });
 
@@ -112,6 +112,10 @@ function findMainRoom(roomId: string): Channel | undefined {
 
 const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any) => {
     const intent = appservice.getIntent('polychat');
+    if (event.sender === `@polychat:${HOMESERVER_NAME}`) {
+        // Ignore echo
+        return;
+    }
 
     const handOutRegExp = /^hand out ([a-z]+?) ([a-z]+?)$/;
     const match = event.content.body.match(handOutRegExp);
@@ -132,7 +136,7 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any
         return;
     }
 
-    intent.sendEvent(subRoom.roomId, event.content);
+    intent.sendEvent(channel.mainRoomId, event.content);
 };
 
 const onMessageInMainRoom = async (channel: Channel, event: any) => {
@@ -188,8 +192,56 @@ async function createRooms() {
     }
 }
 
+async function hardcodedFootballCreationForChristian() {
+    const intent = appservice.getIntent('polychat');
+    await intent.ensureRegistered();
+
+    await intent.underlyingClient.createRoom({
+        name: 'Football - User A',
+        room_alias_name: 'irc_inspircd_football-usera',
+        invite: [`@jaller94:${HOMESERVER_NAME}`],
+    });
+
+    await intent.underlyingClient.createRoom({
+        name: 'Football - User B',
+        room_alias_name: 'irc_inspircd_football-userb',
+        invite: [`@jaller94:${HOMESERVER_NAME}`],
+    });
+}
+
+async function hardcodedForRetreat() {
+    const intent = appservice.getIntent('polychat');
+    await intent.ensureRegistered();
+
+    const mainRoomId = await intent.underlyingClient.createRoom({
+        name: `Football ${new Date().toISOString()}`,
+        // invite: [`@jaller94:${HOMESERVER_NAME}`],
+    });
+
+    const channel: Channel = {
+        name: 'Football',
+        mainRoomId,
+        unclaimedSubRooms: [],
+        claimedSubRooms: [],
+        activeSubRooms: [],
+    };
+
+    channels.set('football', channel);
+    for (const username of ['usera', 'userb']) {
+        const roomId = await intent.ensureJoined(`#irc_inspircd_football-${username}:${HOMESERVER_NAME}`);
+        channel.activeSubRooms.push({
+            ready: new Date(),
+            roomId,
+            user: {
+                handOut: new Date(),
+                identity: 'inherit',
+            },
+        });
+    }
+}
+
 appservice.begin().then(() => {
     console.log('running');
-}).then(createRooms);
+}).then(hardcodedForRetreat);
 
 // console.log(as.eventNames());
