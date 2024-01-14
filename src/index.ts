@@ -6,6 +6,7 @@ import {
     SimpleFsStorageProvider,
     SimpleRetryJoinStrategy,
     AutojoinRoomsMixin,
+    PowerLevelAction,
 } from "matrix-bot-sdk";
 
 import * as path from 'node:path';
@@ -275,7 +276,7 @@ async function hardcodedForRetreat() {
     channels.set('football', channel);
     for (const username of ['usera', 'userb']) {
         const roomId = await intent.ensureJoined(`#irc_#football-${username}:${HOMESERVER_NAME}`);
-        if (DEBUG_MXID) {
+        if (DEBUG_MXID && await intent.underlyingClient.userHasPowerLevelForAction(`#irc_#football-${username}:${HOMESERVER_NAME}`, roomId, PowerLevelAction.Invite)) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
