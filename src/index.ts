@@ -137,7 +137,16 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any
 
     // commands
     if (event.content.body === '!members') {
-        await polychatIntent.sendText(subRoom.roomId, `Members:\n* Anna\n* Bernd`);
+        const joinedMembers = await polychatIntent.underlyingClient.getJoinedRoomMembersWithProfiles(channel.mainRoomId);
+        let text = 'Members:';
+        for (const [mxid, member] of Object.entries(joinedMembers)) {
+            if (mxid === `@polychat:${HOMESERVER_NAME}`) {
+                // Ignore Polychat bot
+                continue;
+            }
+            text += `\n* ${member.display_name}`;
+        }
+        await polychatIntent.sendText(subRoom.roomId, text);
         return;
     }
 
@@ -276,7 +285,11 @@ async function hardcodedForRetreat() {
     channels.set('football', channel);
     for (const username of ['usera', 'userb']) {
         const roomId = await intent.ensureJoined(`#irc_#football-${username}:${HOMESERVER_NAME}`);
-        if (DEBUG_MXID && await intent.underlyingClient.userHasPowerLevelForAction(`#irc_#football-${username}:${HOMESERVER_NAME}`, roomId, PowerLevelAction.Invite)) {
+        if (
+            DEBUG_MXID
+            && await intent.underlyingClient.userHasPowerLevelForAction(`#irc_#football-${username}:${HOMESERVER_NAME}`, roomId, PowerLevelAction.Invite)
+            && !(await intent.underlyingClient.getJoinedRoomMembers(roomId)).includes(DEBUG_MXID)
+        ) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
