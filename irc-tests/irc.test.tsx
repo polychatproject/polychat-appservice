@@ -1,11 +1,9 @@
-import { afterAll, beforeEach, describe, test } from "bun:test";
+import { afterAll, describe, test } from "bun:test";
 import { createReadStream, createWriteStream, ReadStream, WriteStream } from 'node:fs';
 import * as fsPromise from 'node:fs/promises';
 import * as path from 'node:path';
-import * as readline from 'node:readline';
-import * as net from 'node:net';
 
-const PATH_II = '/home/jaller94/Git2/polychat/PolyChat-LocalDeployment/mxtest/data/debian-pcc/irc/inspircd';
+const PATH_II = process.env.PATH_II_SERVER || '/home/jaller94/Git2/polychat/PolyChat-LocalDeployment/mxtest/data/debian-pcc/irc/inspircd';
 
 function write(stream: WriteStream, data: string): Promise<void> {
     return new Promise(res => {
@@ -21,7 +19,7 @@ function timeout(ms: number): Promise<void> {
     return new Promise(res => setTimeout(res, ms));
 }
 
-describe('basic ii functionality', () => {
+describe('same channel (no bridge)', () => {
     const channelName = '#foo';
     let inGlobal: WriteStream;
     let inFoo: WriteStream;
@@ -59,7 +57,7 @@ describe('basic ii functionality', () => {
     });
 });
 
-describe('polychat hardcoded bridge', () => {
+describe('polychat hardcoded football bridge', () => {
     const channelUserA = '#football-usera';
     const channelUserB = '#football-userb';
 
