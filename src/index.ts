@@ -7,6 +7,7 @@ import {
     SimpleRetryJoinStrategy,
     AutojoinRoomsMixin,
     PowerLevelAction,
+    RichReply,
 } from "matrix-bot-sdk";
 
 import * as path from 'node:path';
@@ -115,19 +116,20 @@ function findMainRoom(roomId: string): Channel | undefined {
     }
 }
 
-const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any) => {
+const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any): Promise<void> => {
     const polychatIntent = appservice.getIntent('polychat');
     if (event.sender === `@polychat:${HOMESERVER_NAME}`) {
         // Ignore echo
         return;
     }
 
-    const handOutRegExp = /^hand out ([a-z]+?) ([a-z]+?)$/;
-    const match = event.content.body.match(handOutRegExp);
+    const handOutRegExp = /^hand out (?<channelId>[a-z]+?) (?<network>[a-z]+?)$/;
+    const body = event.content.body as string;
+    const match = body.match(handOutRegExp);
     if (match) {
         const polychatIntent = appservice.getIntent('polychat');
         try {
-            const url = await handOutSubRoom(match[1], match[2]);
+            const url = await handOutSubRoom(match.groups!['channelId']!, match.groups!['network']!);
             await polychatIntent.sendText(subRoom.roomId, `here you go ${url}`);
         } catch (error: any) {
             await polychatIntent.sendText(subRoom.roomId, `error ${error.message}`);
@@ -160,7 +162,7 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any
     await intent.sendEvent(channel.mainRoomId, event.content);
 };
 
-const onMessageInMainRoom = async (channel: Channel, event: any) => {
+const onMessageInMainRoom = async (channel: Channel, event: any): Promise<void> => {
     const intent = appservice.getIntent('polychat');
     for (const subRoom of channel.activeSubRooms) {
         if (subRoom.user && event.sender === `@${subRoom.user.localpart}:${HOMESERVER_NAME}`) {
@@ -170,6 +172,47 @@ const onMessageInMainRoom = async (channel: Channel, event: any) => {
         intent.sendEvent(subRoom.roomId, event.content);
     }
 };
+
+const createChannel = async (opts: {name: string}): Promise<Channel> => {
+    const intent = appservice.getIntent('polychat');
+    await intent.ensureRegistered();
+
+    const mainRoomId = await intent.underlyingClient.createRoom({
+        name: `Football ${new Date().toISOString()}`,
+    });
+    if (DEBUG_MXID) {
+        await intent.underlyingClient.inviteUser(DEBUG_MXID, mainRoomId);
+        await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, mainRoomId, 50);
+    }
+
+    const channel: Channel = {
+        name: opts.name,
+        mainRoomId,
+        unclaimedSubRooms: [],
+        claimedSubRooms: [],
+        activeSubRooms: [],
+    };
+
+    channels.set('a', channel);
+
+    return channel;
+};
+
+const onMessageInControlRoom = async (roomId: string, event: any): Promise<void> => {
+    const handOutRegExp = /^create polychat (?<name>[a-zA-Z0-9]+?)$/;
+    const body = event.content.body as string;
+    const match = body.match(handOutRegExp);
+    if (match) {
+        const polychatIntent = appservice.getIntent('polychat');
+        try {
+            const url = await createChannel({ name: match.groups!['name']! })
+            await polychatIntent.sendEvent(roomId, ` ${url}`);
+        } catch (error: any) {
+            await polychatIntent.sendText(roomId, `error ${error.message}`);
+        }
+        return;
+    }
+}
 
 // Attach listeners here
 appservice.on("room.message", async (roomId: string, event: any) => {
@@ -184,6 +227,8 @@ appservice.on("room.message", async (roomId: string, event: any) => {
     if (channel) {
         return onMessageInMainRoom(channel, event);
     }
+
+    return onMessageInControlRoom(roomId, event);
 
     console.info(`Didn't know what to do with event in ${roomId}`);
 });
