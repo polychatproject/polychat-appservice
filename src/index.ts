@@ -7,11 +7,11 @@ import {
     SimpleRetryJoinStrategy,
     AutojoinRoomsMixin,
     PowerLevelAction,
-} from "matrix-bot-sdk";
+} from 'matrix-bot-sdk';
 
 import * as path from 'node:path';
-import { uniqueId } from "./helper";
-import { GenericTransformer } from "./transformers/generic";
+import { uniqueId } from './helper';
+import { GenericTransformer } from './transformers/generic';
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_CONFIG = process.env.PATH_CONFIG || './config';
@@ -194,6 +194,7 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any
 
     const intent = appservice.getIntent(user.localpart);
     await ensureDisplayNameInRoom(channel.mainRoomId, user.localpart, await getDisplayNameForChannel(channel, subRoom, user));
+    console.log('onMessageInSubRoom content', JSON.stringify(event.content));
     await intent.sendEvent(channel.mainRoomId, event.content);
 };
 
@@ -208,7 +209,7 @@ const onMessageInMainRoom = async (channel: Channel, event: any): Promise<void> 
             continue;
         }
         const { content } = await transformer.transformEventForNetwork(channel, event);
-        console.log('content', JSON.stringify(content));
+        console.log('onMessageInMainRoom content', JSON.stringify(content));
         intent.sendEvent(subRoom.roomId, content);
     }
 };
@@ -268,7 +269,7 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
         const polychatIntent = appservice.getIntent('polychat');
         try {
             const url = await createChannel({ name: match.groups!['name']! })
-            await polychatIntent.sendEvent(roomId, ` ${url}`);
+            await polychatIntent.sendText(roomId, ` ${url}`);
         } catch (error: any) {
             await polychatIntent.sendText(roomId, `error ${error.message}`);
         }
@@ -277,7 +278,7 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
 }
 
 // Attach listeners here
-appservice.on("room.message", async (roomId: string, event: any) => {
+appservice.on('room.message', async (roomId: string, event: any) => {
     if (!event['content']?.['msgtype']) return;
 
     const subRoomInfo = findSubRoom(roomId);
@@ -295,7 +296,8 @@ appservice.on("room.message", async (roomId: string, event: any) => {
     console.info(`Didn't know what to do with event in ${roomId}`);
 });
 
-appservice.on("room.event", async (roomId: string, event: any) => {
+appservice.on('room.event', async (roomId: string, event: any) => {
+    console.log('room.event', JSON.stringify(event));
     const polychatIntent = appservice.getIntent('polychat');
     if (event.sender === polychatIntent.userId) {
         // Ignore echo
@@ -303,8 +305,15 @@ appservice.on("room.event", async (roomId: string, event: any) => {
         return;
     }
 
-    // Main room: Member joined or left
     if (event['type'] === 'm.room.member') {
+        // Sub room: Member joined or left
+        const subRoomInfo = findSubRoom(roomId);
+        if (subRoomInfo) {
+            await onMessageInSubRoom(subRoomInfo.subRoom, subRoomInfo.channel, event);
+            return;
+        }
+
+        // Main room: Member joined or left
         const channel = findMainRoom(roomId);
         if (channel) {
             console.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
@@ -322,7 +331,7 @@ appservice.on("room.event", async (roomId: string, event: any) => {
             console.info(`Main room: name changed ${JSON.stringify(event.content)}`);
             const intent = appservice.getIntent('polychat');
             for (const subRoom of channel.activeSubRooms) {
-                await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
+                // await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
             }
         }
     }
@@ -334,7 +343,7 @@ appservice.on("room.event", async (roomId: string, event: any) => {
             console.info(`Main room: avatar changed ${JSON.stringify(event.content)}`);
             const intent = appservice.getIntent('polychat');
             for (const subRoom of channel.activeSubRooms) {
-                await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
+                // await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
             }
         }
     }
