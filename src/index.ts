@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import * as path from 'node:path';
 import {
     Appservice,
@@ -9,6 +10,7 @@ import {
 } from 'matrix-bot-sdk';
 import { parse as parseYAML } from 'yaml';
 import { uniqueId } from './helper';
+import api from './api';
 import { GenericTransformer } from './transformers/generic';
 
 const DEBUG_MXID = process.env.DEBUG_MXID;
@@ -26,7 +28,7 @@ const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
 const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
 const TELEGRAM_BRIDGE_MXID = process.env.TELEGRAM_BRIDGE_MXID;
 
-const registration: IAppserviceRegistration = parseYAML(path.join(PATH_CONFIG, 'registration.yaml'));
+const registration: IAppserviceRegistration = parseYAML(fs.readFileSync(path.join(PATH_CONFIG, 'registration.yaml'), 'utf8'));
 
 const appservice = new Appservice({
     port: APPSERVICE_PORT,
@@ -299,7 +301,7 @@ appservice.on('room.message', async (roomId: string, event: any) => {
 });
 
 appservice.on('room.event', async (roomId: string, event: any) => {
-    console.log('room.event', JSON.stringify(event));
+    console.debug('room.event', JSON.stringify(event));
     const polychatIntent = appservice.getIntent('polychat');
     if (event.sender === polychatIntent.userId) {
         // Ignore echo
@@ -320,6 +322,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         if (channel) {
             console.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
             const intent = appservice.getIntent('polychat');
+            // TODO: Find display name of user
             for (const subRoom of channel.activeSubRooms) {
                 await intent.underlyingClient.sendNotice(subRoom.roomId, `${event['state_key']} changed to ${event.content.membership}`);
             }
@@ -333,7 +336,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
             console.info(`Main room: name changed ${JSON.stringify(event.content)}`);
             const intent = appservice.getIntent('polychat');
             for (const subRoom of channel.activeSubRooms) {
-                // await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
+                await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
             }
         }
     }
@@ -345,7 +348,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
             console.info(`Main room: avatar changed ${JSON.stringify(event.content)}`);
             const intent = appservice.getIntent('polychat');
             for (const subRoom of channel.activeSubRooms) {
-                // await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
+                await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
             }
         }
     }
@@ -455,8 +458,12 @@ async function hardcodedForRetreat() {
     }
 }
 
+// AppService
 appservice.begin().then(() => {
-    console.log('running');
+    console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
 }).then(hardcodedForRetreat);
 
-// console.log(as.eventNames());
+// API
+api.listen(API_PORT, API_BIND_ADDRESS, () => {
+    console.info(`API: Listening on ${API_BIND_ADDRESS}:${API_PORT}`);
+});
