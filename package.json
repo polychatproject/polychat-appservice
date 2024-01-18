@@ -2,6 +2,7 @@
   "name": "polychat-appservice",
   "private": true,
   "type": "module",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "start": "bun run src/index.ts",
     "test:irc": "bun test irc-tests/**"
@@ -17,6 +18,7 @@
     "@types/multer": "^1.4.11",
     "express": "^4.18.2",
     "matrix-bot-sdk": "^0.7.0",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "yaml": "^2.3.4"
   }
 }

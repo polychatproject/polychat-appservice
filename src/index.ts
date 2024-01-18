@@ -1,5 +1,4 @@
-// require('./instrumentation.ts');
-
+import * as path from 'node:path';
 import {
     Appservice,
     IAppserviceRegistration,
@@ -8,35 +7,30 @@ import {
     AutojoinRoomsMixin,
     PowerLevelAction,
 } from 'matrix-bot-sdk';
-
-import * as path from 'node:path';
+import { parse as parseYAML } from 'yaml';
 import { uniqueId } from './helper';
 import { GenericTransformer } from './transformers/generic';
 
-const PATH_DATA = process.env.PATH_DATA || './data';
-const PATH_CONFIG = process.env.PATH_CONFIG || './config';
+const DEBUG_MXID = process.env.DEBUG_MXID;
+const API_BIND_ADDRESS = process.env.API_BIND_ADDRESS || '127.0.0.1';
+const API_PORT = typeof process.env.API_PORT === 'string' ? Number.parseInt(process.env.API_PORT) : 9999;
+const APPSERVICE_BIND_ADDRESS = process.env.APPSERVICE_BIND_ADDRESS || '127.0.0.1';
+const APPSERVICE_PORT = typeof process.env.APPSERVICE_PORT === 'string' ? Number.parseInt(process.env.APPSERVICE_PORT) : 9999;
 const HOMESERVER_NAME = process.env.HOMESERVER_NAME || 'localhost';
 const HOMESERVER_URL = process.env.HOMESERVER_URL || 'http://localhost:8008';
-const DEBUG_MXID = process.env.DEBUG_MXID;
+const PATH_DATA = process.env.PATH_DATA || './data';
+const PATH_CONFIG = process.env.PATH_CONFIG || './data';
+const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
+const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
+const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
+const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
+const TELEGRAM_BRIDGE_MXID = process.env.TELEGRAM_BRIDGE_MXID;
 
-const registration: IAppserviceRegistration = {
-    as_token: 'ha',
-    hs_token: 'ha',
-    namespaces: {
-        users: [
-            {
-                exclusive: false,
-                regex: '@polychat_.*'
-            }
-        ],
-        rooms: [],
-        aliases: [],
-    },
-    sender_localpart: 'polychat',
-};
+const registration: IAppserviceRegistration = parseYAML(path.join(PATH_CONFIG, 'registration.yaml'));
+
 const appservice = new Appservice({
-    port: 9999,
-    bindAddress: '0.0.0.0',
+    port: APPSERVICE_PORT,
+    bindAddress: APPSERVICE_BIND_ADDRESS,
     homeserverName: HOMESERVER_NAME,
     homeserverUrl: HOMESERVER_URL,
     registration,
@@ -243,22 +237,30 @@ const createChannel = async (opts: {name: string}): Promise<Channel> => {
 };
 
 const createSubRoom = async (opts: {channel: Channel, network: string}) => {
-    if (opts.network !== 'irc') {
-        throw Error(`Network not implemented: ${opts.network}`);
+    if (opts.network === 'irc') {
+        if (!IRC_BRIDGE_MXID) {
+            throw Error(`Network not configured: ${opts.network}`);
+        }
+        const roomId = await intent.underlyingClient.createRoom({
+            name: opts.channel.name,
+        });
+        if (DEBUG_MXID) {
+            await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
+            await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
+        }
+        await intent.underlyingClient.inviteUser(IRC_BRIDGE_MXID, roomId);
+
+        const dmRoomId = await intent.underlyingClient.dms.getOrCreateDm(IRC_BRIDGE_MXID);
+        const ircChannel = uniqueId('polychat_');
+        await intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
+        
+        opts.channel.unclaimedSubRooms.push({
+            ready: new Date(),
+            roomId,
+        });
+        return;
     }
-    const roomId = await intent.ensureJoined(`#irc_#${uniqueId('subroom-')}:${HOMESERVER_NAME}`);
-    if (
-        DEBUG_MXID
-        && !(await intent.underlyingClient.getJoinedRoomMembers(roomId)).includes(DEBUG_MXID)
-        && !await intent.underlyingClient.userHasPowerLevelForAction(intent.userId, roomId, PowerLevelAction.Invite)
-    ) {
-        await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
-        await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
-    }
-    opts.channel.unclaimedSubRooms.push({
-        ready: new Date(),
-        roomId,
-    });
+    throw Error(`Network not implemented: ${opts.network}`);
 }
 
 const onMessageInControlRoom = async (roomId: string, event: any): Promise<void> => {
