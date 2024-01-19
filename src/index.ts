@@ -231,7 +231,7 @@ export const fillUpSubRoomPool = (polychat: Polychat) => {
         if (!mxid) {
             // Network not configured
             console.debug(`fillUpSubRoomPool: MXID for ${network} not defined`);
-            return;
+            continue;
         }
         const unclaimedSubRooms = polychat.unclaimedSubRooms.filter(subRoom => subRoom.network === network);
         const missing = Math.max(2 - unclaimedSubRooms.length, 0);
