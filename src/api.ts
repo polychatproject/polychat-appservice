@@ -1,7 +1,7 @@
 import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
-import { createPolychat } from '.';
+import { createPolychat, fillUpSubRoomPool } from '.';
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
@@ -39,6 +39,7 @@ api.post('/polychat', upload.single('avatar'), async (req, res) => {
         const polychat = await createPolychat({
             name: req.body.name,
         });
+        fillUpSubRoomPool(polychat);
         res.json({
             id: polychat.mainRoomId,
         });

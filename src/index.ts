@@ -16,7 +16,7 @@ import { GenericTransformer } from './transformers/generic';
 const DEBUG_MXID = process.env.DEBUG_MXID;
 const API_BIND_ADDRESS = process.env.API_BIND_ADDRESS || '0.0.0.0';
 const API_PORT = typeof process.env.API_PORT === 'string' ? Number.parseInt(process.env.API_PORT) : 9998;
-const APPSERVICE_BIND_ADDRESS = process.env.APPSERVICE_BIND_ADDRESS || '127.0.0.1';
+const APPSERVICE_BIND_ADDRESS = process.env.APPSERVICE_BIND_ADDRESS || '0.0.0.0';
 const APPSERVICE_PORT = typeof process.env.APPSERVICE_PORT === 'string' ? Number.parseInt(process.env.APPSERVICE_PORT) : 9999;
 const HOMESERVER_NAME = process.env.HOMESERVER_NAME || 'localhost';
 const HOMESERVER_URL = process.env.HOMESERVER_URL || 'http://localhost:8008';
@@ -76,7 +76,7 @@ async function handOutSubRoom(polychatId: string, network: string): Promise<stri
     if (!polychat) {
         throw Error('E_POLYCHAT_NOT_FOUND');
     }
-    const subRoomIndex = polychat.unclaimedSubRooms.findIndex(subRoom => subRoom.)
+    const subRoomIndex = polychat.unclaimedSubRooms.findIndex(subRoom => subRoom.roomId);
     if (subRoomIndex === -1) {
         throw Error('E_OUT_OF_SUB_ROOMS');
     }
@@ -210,6 +210,28 @@ const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void
     }
 };
 
+export const fillUpSubRoomPool = (polychat: Polychat) => {
+    const networks = {
+        irc: IRC_BRIDGE_MXID,
+        telegram: TELEGRAM_BRIDGE_MXID,
+        signal: SIGNAL_BRIDGE_MXID,
+        whatsapp: WHATSAPP_BRIDGE_MXID,
+    };
+
+    for (const [network, mxid] of Object.entries(networks)) {
+        if (!mxid) {
+            // Network not configured
+            return;
+        }
+        const unclaimedSubRooms = polychat.unclaimedSubRooms.filter(subRoom => subRoom.network === 'irc');
+        const missing = Math.max(2 - unclaimedSubRooms.length, 0);
+        console.info(`Sub Room Pool: Creating ${missing} sub rooms for ${network} for ${polychat.mainRoomId}`);
+        for (let i = 0; i < missing; i++) {
+            createSubRoom({ polychat, network });
+        }
+    }
+};
+
 export const createPolychat = async (opts: {name: string}): Promise<Polychat> => {
     const intent = appservice.getIntent(registration.sender_localpart);
 
@@ -230,23 +252,6 @@ export const createPolychat = async (opts: {name: string}): Promise<Polychat> =>
     };
 
     polychats.push(polychat);
-
-    if (IRC_BRIDGE_MXID) {
-        createSubRoom({ polychat, network: 'irc' });
-        createSubRoom({ polychat, network: 'irc' });
-    }
-    if (TELEGRAM_BRIDGE_MXID) {
-        createSubRoom({ polychat, network: 'telegram' });
-        createSubRoom({ polychat, network: 'telegram' });
-    }
-    if (SIGNAL_BRIDGE_MXID) {
-        createSubRoom({ polychat, network: 'signal' });
-        createSubRoom({ polychat, network: 'signal' });
-    }
-    if (WHATSAPP_BRIDGE_MXID) {
-        createSubRoom({ polychat, network: 'whatsapp' });
-        createSubRoom({ polychat, network: 'whatsapp' });
-    }
 
     return polychat;
 };
@@ -302,8 +307,9 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
     if (match) {
         const polychatIntent = appservice.getIntent(registration.sender_localpart);
         try {
-            const url = await createPolychat({ name: match.groups!['name']! })
-            await polychatIntent.sendText(roomId, ` ${url}`);
+            const polychat = await createPolychat({ name: match.groups!['name']! });
+            fillUpSubRoomPool(polychat);
+            await polychatIntent.sendText(roomId, ` ${polychat.mainRoomId}`);
         } catch (error: any) {
             await polychatIntent.sendText(roomId, `error ${error.message}`);
         }
@@ -446,25 +452,10 @@ async function hardcodedFootballCreationForChristian() {
 }
 
 async function hardcodedForRetreat() {
-    const intent = appservice.getIntent(registration.sender_localpart);
-
-    const mainRoomId = await intent.underlyingClient.createRoom({
-        name: `Football ${new Date().toISOString()}`,
-    });
-    if (DEBUG_MXID) {
-        await intent.underlyingClient.inviteUser(DEBUG_MXID, mainRoomId);
-        await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, mainRoomId, 50);
-    }
-
-    const polychat: Polychat = {
+    const polychat = await createPolychat({
         name: 'Football',
-        mainRoomId,
-        unclaimedSubRooms: [],
-        claimedSubRooms: [],
-        activeSubRooms: [],
-    };
+    });
 
-    polychats.push(polychat);
     for (const username of ['usera', 'userb']) {
         const roomId = await intent.ensureJoined(`#irc_#football-${username}:${HOMESERVER_NAME}`);
         if (
@@ -491,7 +482,7 @@ async function hardcodedForRetreat() {
 // AppService
 appservice.begin().then(() => {
     console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
-});
+}).then(hardcodedForRetreat);
 
 // API
 api.listen(API_PORT, API_BIND_ADDRESS, () => {
