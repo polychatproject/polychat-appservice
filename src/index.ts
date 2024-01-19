@@ -30,6 +30,11 @@ const TELEGRAM_BRIDGE_MXID = process.env.TELEGRAM_BRIDGE_MXID;
 const TELEGRAM_BRIDGE_TUG_MXID = process.env.TELEGRAM_BRIDGE_TUG_MXID;
 const TELEGRAM_BRIDGE_COMMAND_PREFIX = process.env.TELEGRAM_BRIDGE_COMMAND_PREFIX || '!tg';
 
+console.debug('IRC_BRIDGE_MXID', IRC_BRIDGE_MXID);
+console.debug('SIGNAL_BRIDGE_MXID', SIGNAL_BRIDGE_MXID);
+console.debug('TELEGRAM_BRIDGE_MXID', TELEGRAM_BRIDGE_MXID);
+console.debug('WHATSAPP_BRIDGE_MXID', WHATSAPP_BRIDGE_MXID);
+
 const registration: IAppserviceRegistration = parseYAML(fs.readFileSync(path.join(PATH_CONFIG, 'registration.yaml'), 'utf8'));
 
 const appservice = new Appservice({
@@ -225,6 +230,7 @@ export const fillUpSubRoomPool = (polychat: Polychat) => {
     for (const [network, mxid] of Object.entries(networks)) {
         if (!mxid) {
             // Network not configured
+            console.debug(`fillUpSubRoomPool: MXID for ${network} not defined`);
             return;
         }
         const unclaimedSubRooms = polychat.unclaimedSubRooms.filter(subRoom => subRoom.network === network);
