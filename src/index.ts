@@ -127,8 +127,8 @@ const ensureDisplayNameInRoom = async (roomId: string, localpart: string, displa
     // }
 };
 
-const getDisplayNameForPolychat = async (channel: Polychat, subRoom: SubRoom, user: SubRoomUser): Promise<string> => {
-    console.debug('Called getDisplayNameForPolychat', channel.mainRoomId, user.localpart);
+const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, user: SubRoomUser): Promise<string> => {
+    console.debug('Called getDisplayNameForPolychat', polychat.mainRoomId, user.localpart);
     if (user.identity === 'custom') {
         return user.displayName;
     }
@@ -143,9 +143,9 @@ const getDisplayNameForPolychat = async (channel: Polychat, subRoom: SubRoom, us
     }
 };
 
-const onMessageInSubRoom = async (subRoom: SubRoom, channel: Polychat, event: any): Promise<void> => {
+const onMessageInSubRoom = async (subRoom: SubRoom, polychat: Polychat, event: any): Promise<void> => {
     console.debug('Called onMessageInSubRoom', {
-        channel: channel.mainRoomId,
+        polychat: polychat.mainRoomId,
         event: event.event_id,
     });
     const polychatIntent = appservice.getIntent(registration.sender_localpart);
@@ -154,12 +154,12 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Polychat, event: an
         return;
     }
 
-    const handOutRegExp = /^hand out (?<channelId>[a-z]+?) (?<network>[a-z]+?)$/;
+    const handOutRegExp = /^hand out (?<polychatId>[a-z]+?) (?<network>[a-z]+?)$/;
     const body = event.content.body as string;
     const match = body.match(handOutRegExp);
     if (match) {
         try {
-            const url = await handOutSubRoom(match.groups!['channelId']!, match.groups!['network']!);
+            const url = await handOutSubRoom(match.groups!['polychatId']!, match.groups!['network']!);
             await polychatIntent.sendText(subRoom.roomId, `here you go ${url}`);
         } catch (error: any) {
             await polychatIntent.sendText(subRoom.roomId, `error ${error.message}`);
@@ -169,7 +169,7 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Polychat, event: an
 
     // commands
     if (event.content.body === '!members') {
-        const joinedMembers = await polychatIntent.underlyingClient.getJoinedRoomMembersWithProfiles(channel.mainRoomId);
+        const joinedMembers = await polychatIntent.underlyingClient.getJoinedRoomMembersWithProfiles(polychat.mainRoomId);
         let text = 'Members:';
         for (const [mxid, member] of Object.entries(joinedMembers)) {
             if (mxid === polychatIntent.userId) {
@@ -189,22 +189,22 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Polychat, event: an
     }
 
     const intent = appservice.getIntent(user.localpart);
-    await ensureDisplayNameInRoom(channel.mainRoomId, user.localpart, await getDisplayNameForPolychat(channel, subRoom, user));
+    await ensureDisplayNameInRoom(polychat.mainRoomId, user.localpart, await getDisplayNameForPolychat(polychat, subRoom, user));
     console.log('onMessageInSubRoom content', JSON.stringify(event.content));
-    await intent.sendEvent(channel.mainRoomId, event.content);
+    await intent.sendEvent(polychat.mainRoomId, event.content);
 };
 
 const transformer = new GenericTransformer();
 
-const onMessageInMainRoom = async (channel: Polychat, event: any): Promise<void> => {
+const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void> => {
     const intent = appservice.getIntent(registration.sender_localpart);
-    // const senderProfile = (await intent.underlyingClient.getRoomStateEvent(channel.mainRoomId, 'm.room.member', event.sender)).content;
-    for (const subRoom of channel.activeSubRooms) {
+    // const senderProfile = (await intent.underlyingClient.getRoomStateEvent(polychat.mainRoomId, 'm.room.member', event.sender)).content;
+    for (const subRoom of polychat.activeSubRooms) {
         if (subRoom.user && event.sender === `@${subRoom.user.localpart}:${HOMESERVER_NAME}`) {
             // Don't send echo
             continue;
         }
-        const { content } = await transformer.transformEventForNetwork(channel, event);
+        const { content } = await transformer.transformEventForNetwork(polychat, event);
         console.log('onMessageInMainRoom content', JSON.stringify(content));
         intent.sendEvent(subRoom.roomId, content);
     }
@@ -320,9 +320,9 @@ appservice.on('room.message', async (roomId: string, event: any) => {
         return onMessageInSubRoom(subRoomInfo.subRoom, subRoomInfo.polychat, event);
     }
 
-    const channel = findMainRoom(roomId);
-    if (channel) {
-        return onMessageInMainRoom(channel, event);
+    const polychat = findMainRoom(roomId);
+    if (polychat) {
+        return onMessageInMainRoom(polychat, event);
     }
 
     return onMessageInControlRoom(roomId, event);
@@ -343,17 +343,17 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         // Sub room: Member joined or left
         const subRoomInfo = findSubRoom(roomId);
         if (subRoomInfo) {
-            await onMessageInSubRoom(subRoomInfo.subRoom, subRoomInfo.channel, event);
+            await onMessageInSubRoom(subRoomInfo.subRoom, subRoomInfo.polychat, event);
             return;
         }
 
         // Main room: Member joined or left
-        const channel = findMainRoom(roomId);
-        if (channel) {
+        const polychat = findMainRoom(roomId);
+        if (polychat) {
             console.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
             const intent = appservice.getIntent(registration.sender_localpart);
             // TODO: Find display name of user
-            for (const subRoom of channel.activeSubRooms) {
+            for (const subRoom of polychat.activeSubRooms) {
                 await intent.underlyingClient.sendNotice(subRoom.roomId, `${event['state_key']} changed to ${event.content.membership}`);
             }
         }
@@ -361,11 +361,11 @@ appservice.on('room.event', async (roomId: string, event: any) => {
 
     // Sync room name to sub rooms
     if (event['type'] === 'm.room.name' && event['state_key'] === '') {
-        const channel = findMainRoom(roomId);
-        if (channel) {
+        const polychat = findMainRoom(roomId);
+        if (polychat) {
             console.info(`Main room: name changed ${JSON.stringify(event.content)}`);
             const intent = appservice.getIntent(registration.sender_localpart);
-            for (const subRoom of channel.activeSubRooms) {
+            for (const subRoom of polychat.activeSubRooms) {
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
             }
         }
@@ -373,11 +373,11 @@ appservice.on('room.event', async (roomId: string, event: any) => {
 
     // Sync room avatar to sub rooms
     if (event['type'] === 'm.room.avatar' && event['state_key'] === '') {
-        const channel = findMainRoom(roomId);
-        if (channel) {
+        const polychat = findMainRoom(roomId);
+        if (polychat) {
             console.info(`Main room: avatar changed ${JSON.stringify(event.content)}`);
             const intent = appservice.getIntent(registration.sender_localpart);
-            for (const subRoom of channel.activeSubRooms) {
+            for (const subRoom of polychat.activeSubRooms) {
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
             }
         }

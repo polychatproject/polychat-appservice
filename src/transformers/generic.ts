@@ -1,7 +1,7 @@
-import { Channel } from "..";
+import { Polychat } from "..";
 
 export class GenericTransformer {
-    async transformEventForNetwork(channel: Channel, event: any): Promise<{ content: Record<string, any> }> {
+    async transformEventForNetwork(polychat: Polychat, event: any): Promise<{ content: Record<string, any> }> {
         return {
             content: {
                 ...event.content,

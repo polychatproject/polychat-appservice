@@ -1,7 +1,7 @@
 import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
-import { createChannel } from '.';
+import { createPolychat } from '.';
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
@@ -36,11 +36,11 @@ api.post('/polychat', upload.single('avatar'), async (req, res) => {
         });
     }
     try {
-        const channel = await createChannel({
+        const polychat = await createPolychat({
             name: req.body.name,
         });
         res.json({
-            id: channel.mainRoomId,
+            id: polychat.mainRoomId,
         });
     } catch (error) {
         console.warn('Failed to create Polychat');
