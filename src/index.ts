@@ -231,8 +231,22 @@ export const createPolychat = async (opts: {name: string}): Promise<Polychat> =>
 
     polychats.push(polychat);
 
-    createSubRoom({ polychat, network: 'irc' });
-    createSubRoom({ polychat, network: 'irc' });
+    if (IRC_BRIDGE_MXID) {
+        createSubRoom({ polychat, network: 'irc' });
+        createSubRoom({ polychat, network: 'irc' });
+    }
+    if (TELEGRAM_BRIDGE_MXID) {
+        createSubRoom({ polychat, network: 'telegram' });
+        createSubRoom({ polychat, network: 'telegram' });
+    }
+    if (SIGNAL_BRIDGE_MXID) {
+        createSubRoom({ polychat, network: 'signal' });
+        createSubRoom({ polychat, network: 'signal' });
+    }
+    if (WHATSAPP_BRIDGE_MXID) {
+        createSubRoom({ polychat, network: 'whatsapp' });
+        createSubRoom({ polychat, network: 'whatsapp' });
+    }
 
     return polychat;
 };
