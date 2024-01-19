@@ -25,6 +25,8 @@ bun run start
 * `WHATSAPP_BRIDGE_MXID` - The Matrix User ID of the WhatsApp bridge.
 * `SIGNAL_BRIDGE_MXID` - The Matrix User ID of the Signal bridge.
 * `TELEGRAM_BRIDGE_MXID` - The Matrix User ID of the Telegram bridge.
+* `TELEGRAM_BRIDGE_TUG_MXID` - A 2nd Matrix User ID used for opening a chat group (requires 2 users).
+* `TELEGRAM_BRIDGE_COMMAND_PREFIX` - How to address the Telegram bridge bot? Defaults to "!tg".
 
 ## Documentation
 

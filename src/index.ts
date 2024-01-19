@@ -27,6 +27,8 @@ const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
 const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
 const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
 const TELEGRAM_BRIDGE_MXID = process.env.TELEGRAM_BRIDGE_MXID;
+const TELEGRAM_BRIDGE_TUG_MXID = process.env.TELEGRAM_BRIDGE_TUG_MXID;
+const TELEGRAM_BRIDGE_COMMAND_PREFIX = process.env.TELEGRAM_BRIDGE_COMMAND_PREFIX || '!tg';
 
 const registration: IAppserviceRegistration = parseYAML(fs.readFileSync(path.join(PATH_CONFIG, 'registration.yaml'), 'utf8'));
 
@@ -198,19 +200,21 @@ const transformer = new GenericTransformer();
 
 const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void> => {
     const intent = appservice.getIntent(registration.sender_localpart);
+    const userProfile = await intent.underlyingClient.getRoomStateEvent(polychat.mainRoomId, 'm.room.member', event.sender);
     // const senderProfile = (await intent.underlyingClient.getRoomStateEvent(polychat.mainRoomId, 'm.room.member', event.sender)).content;
     for (const subRoom of polychat.activeSubRooms) {
         if (subRoom.user && event.sender === `@${subRoom.user.localpart}:${HOMESERVER_NAME}`) {
             // Don't send echo
             continue;
         }
-        const { content } = await transformer.transformEventForNetwork(polychat, event);
+        const { content } = await transformer.transformEventForNetwork(polychat, userProfile, event);
         console.log('onMessageInMainRoom content', JSON.stringify(content));
         intent.sendEvent(subRoom.roomId, content);
     }
 };
 
 export const fillUpSubRoomPool = (polychat: Polychat) => {
+    console.log(`Called fillUpSubRoomPool for ${polychat.mainRoomId}`)
     const networks = {
         irc: IRC_BRIDGE_MXID,
         telegram: TELEGRAM_BRIDGE_MXID,
@@ -223,9 +227,11 @@ export const fillUpSubRoomPool = (polychat: Polychat) => {
             // Network not configured
             return;
         }
-        const unclaimedSubRooms = polychat.unclaimedSubRooms.filter(subRoom => subRoom.network === 'irc');
+        const unclaimedSubRooms = polychat.unclaimedSubRooms.filter(subRoom => subRoom.network === network);
         const missing = Math.max(2 - unclaimedSubRooms.length, 0);
         console.info(`Sub Room Pool: Creating ${missing} sub rooms for ${network} for ${polychat.mainRoomId}`);
+        //TODO: Remove debug message
+        appservice.getIntent('polychat').underlyingClient.sendNotice(polychat.mainRoomId, `Sub Room Pool: Creating ${missing} sub rooms for ${network} for ${polychat.mainRoomId}`);
         for (let i = 0; i < missing; i++) {
             createSubRoom({ polychat, network });
         }
@@ -268,6 +274,7 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         const roomId = await intent.underlyingClient.createRoom({
             name: opts.polychat.name,
         });
+        await appservice.getIntent(registration.sender_localpart).underlyingClient.sendNotice(opts.polychat.mainRoomId, `Created sub room ${roomId}`);
         if (DEBUG_MXID) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
@@ -275,8 +282,14 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         await intent.underlyingClient.inviteUser(IRC_BRIDGE_MXID, roomId);
 
         const dmRoomId = await intent.underlyingClient.dms.getOrCreateDm(IRC_BRIDGE_MXID);
+        if (DEBUG_MXID && !(await intent.underlyingClient.getJoinedRoomMembers(dmRoomId)).includes(DEBUG_MXID)) {
+            intent.underlyingClient.inviteUser(DEBUG_MXID, dmRoomId);
+        }
         const ircChannel = uniqueId('polychat_');
-        await intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
+        // TODO: Wait for join, then set up link
+        setTimeout(() => {
+            intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
+        }, 15000);
         
         opts.polychat.unclaimedSubRooms.push({
             network: opts.network,
@@ -288,6 +301,9 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         if (!TELEGRAM_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
         }
+        if (!TELEGRAM_BRIDGE_TUG_MXID) {
+            throw Error(`TELEGRAM_BRIDGE_TUG_MXID required to open Telegram sub rooms`);
+        }
         const roomId = await intent.underlyingClient.createRoom({
             name: opts.polychat.name,
         });
@@ -296,6 +312,23 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_MXID, roomId);
+        await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_TUG_MXID, roomId);
+        const tugIntent = appservice.getIntentForUserId(TELEGRAM_BRIDGE_TUG_MXID);
+        await tugIntent.underlyingClient.joinRoom(roomId);
+        // TODO: Wait for join, then set up link
+        setTimeout(() => {
+            intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} create group`);
+            setTimeout(() => {
+                tugIntent.underlyingClient.leaveRoom(roomId);
+            }, 15000);
+        }, 15000);
+        // TODO: Get invite link
+
+        opts.polychat.unclaimedSubRooms.push({
+            network: opts.network,
+            ready: new Date(),
+            roomId,
+        });
     }
     throw Error(`Network not implemented: ${opts.network}`);
 }
@@ -453,30 +486,32 @@ async function hardcodedFootballCreationForChristian() {
 
 async function hardcodedForRetreat() {
     const polychat = await createPolychat({
-        name: 'Football',
+        name: 'Harald',
     });
 
-    for (const username of ['usera', 'userb']) {
-        const roomId = await intent.ensureJoined(`#irc_#football-${username}:${HOMESERVER_NAME}`);
-        if (
-            DEBUG_MXID
-            && await intent.underlyingClient.userHasPowerLevelForAction(intent.userId, roomId, PowerLevelAction.Invite)
-            && !(await intent.underlyingClient.getJoinedRoomMembers(roomId)).includes(DEBUG_MXID)
-        ) {
-            await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
-            await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
-        }
-        polychat.activeSubRooms.push({
-            network: 'irc',
-            ready: new Date(),
-            roomId,
-            user: {
-                localpart: uniqueId('polychat_'),
-                handOut: new Date(),
-                identity: 'inherit',
-            },
-        });
-    }
+    fillUpSubRoomPool(polychat);
+
+    // for (const username of ['usera', 'userb']) {
+    //     const roomId = await intent.ensureJoined(`#irc_#football-${username}:${HOMESERVER_NAME}`);
+    //     if (
+    //         DEBUG_MXID
+    //         && await intent.underlyingClient.userHasPowerLevelForAction(intent.userId, roomId, PowerLevelAction.Invite)
+    //         && !(await intent.underlyingClient.getJoinedRoomMembers(roomId)).includes(DEBUG_MXID)
+    //     ) {
+    //         await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
+    //         await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
+    //     }
+    //     polychat.activeSubRooms.push({
+    //         network: 'irc',
+    //         ready: new Date(),
+    //         roomId,
+    //         user: {
+    //             localpart: uniqueId('polychat_'),
+    //             handOut: new Date(),
+    //             identity: 'inherit',
+    //         },
+    //     });
+    // }
 }
 
 // AppService
