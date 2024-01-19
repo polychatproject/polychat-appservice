@@ -96,12 +96,12 @@ async function handOutSubRoom(polychatId: string, network: string): Promise<stri
     return subRoom.url!;
 }
 
-function findSubRoom(roomId: string): { channel: Polychat, subRoom: SubRoom } | undefined {
-    for (const channel of polychats.values()) {
-        const subRoom = [...channel.activeSubRooms].find(r => r.roomId === roomId);
+function findSubRoom(roomId: string): { polychat: Polychat, subRoom: SubRoom } | undefined {
+    for (const polychat of polychats) {
+        const subRoom = [...polychat.activeSubRooms].find(r => r.roomId === roomId);
         if (subRoom) {
             return {
-                channel,
+                polychat,
                 subRoom,
             };
         }
@@ -109,15 +109,11 @@ function findSubRoom(roomId: string): { channel: Polychat, subRoom: SubRoom } | 
 }
 
 function findMainRoom(roomId: string): Polychat | undefined {
-    for (const channel of polychats.values()) {
-        if (channel.mainRoomId === roomId) {
-            return channel;
+    for (const polychat of polychats) {
+        if (polychat.mainRoomId === roomId) {
+            return polychat;
         }
     }
-}
-
-function pushPolychat(channel: Polychat): void {
-    polychats.set(`c${uniqueId()}`, channel);
 }
 
 const ensureDisplayNameInRoom = async (roomId: string, localpart: string, displayName: string) => {
@@ -225,7 +221,7 @@ export const createPolychat = async (opts: {name: string}): Promise<Polychat> =>
         await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, mainRoomId, 50);
     }
 
-    const channel: Polychat = {
+    const polychat: Polychat = {
         name: opts.name,
         mainRoomId,
         unclaimedSubRooms: [],
@@ -233,21 +229,25 @@ export const createPolychat = async (opts: {name: string}): Promise<Polychat> =>
         activeSubRooms: [],
     };
 
-    pushPolychat(channel);
+    polychats.push(polychat);
 
-    createSubRoom({ channel, network: 'irc' });
-    createSubRoom({ channel, network: 'irc' });
+    createSubRoom({ polychat, network: 'irc' });
+    createSubRoom({ polychat, network: 'irc' });
 
-    return channel;
+    return polychat;
 };
 
-const createSubRoom = async (opts: {channel: Polychat, network: string}) => {
+const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
+    console.debug('Called createSubRoom', {
+        polychat: opts.polychat.mainRoomId,
+        network: opts.network,
+    });
     if (opts.network === 'irc') {
         if (!IRC_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
         }
         const roomId = await intent.underlyingClient.createRoom({
-            name: opts.channel.name,
+            name: opts.polychat.name,
         });
         if (DEBUG_MXID) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
@@ -259,11 +259,24 @@ const createSubRoom = async (opts: {channel: Polychat, network: string}) => {
         const ircChannel = uniqueId('polychat_');
         await intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
         
-        opts.channel.unclaimedSubRooms.push({
+        opts.polychat.unclaimedSubRooms.push({
+            network: opts.network,
             ready: new Date(),
             roomId,
         });
         return;
+    } else if (opts.network === 'telegram') {
+        if (!TELEGRAM_BRIDGE_MXID) {
+            throw Error(`Network not configured: ${opts.network}`);
+        }
+        const roomId = await intent.underlyingClient.createRoom({
+            name: opts.polychat.name,
+        });
+        if (DEBUG_MXID) {
+            await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
+            await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
+        }
+        await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_MXID, roomId);
     }
     throw Error(`Network not implemented: ${opts.network}`);
 }
@@ -290,7 +303,7 @@ appservice.on('room.message', async (roomId: string, event: any) => {
 
     const subRoomInfo = findSubRoom(roomId);
     if (subRoomInfo) {
-        return onMessageInSubRoom(subRoomInfo.subRoom, subRoomInfo.channel, event);
+        return onMessageInSubRoom(subRoomInfo.subRoom, subRoomInfo.polychat, event);
     }
 
     const channel = findMainRoom(roomId);
@@ -372,7 +385,7 @@ async function createRooms() {
         }),
     });
 
-    const channel: Polychat = {
+    const polychat: Polychat = {
         name: 'Yoga',
         mainRoomId,
         unclaimedSubRooms: [],
@@ -380,7 +393,7 @@ async function createRooms() {
         activeSubRooms: [],
     };
 
-    polychats.set('yoga', channel);
+    polychats.push(polychat);
 
     for (let i = 0; i < 4; i++) {
         const roomId = await intent.underlyingClient.createRoom({
@@ -390,7 +403,8 @@ async function createRooms() {
                 invite: [DEBUG_MXID],
             }),
         });
-        channel.unclaimedSubRooms.push({
+        polychat.unclaimedSubRooms.push({
+            network: 'irc',
             ready: new Date(),
             roomId,
         });
@@ -428,7 +442,7 @@ async function hardcodedForRetreat() {
         await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, mainRoomId, 50);
     }
 
-    const channel: Polychat = {
+    const polychat: Polychat = {
         name: 'Football',
         mainRoomId,
         unclaimedSubRooms: [],
@@ -436,7 +450,7 @@ async function hardcodedForRetreat() {
         activeSubRooms: [],
     };
 
-    polychats.set('football', channel);
+    polychats.push(polychat);
     for (const username of ['usera', 'userb']) {
         const roomId = await intent.ensureJoined(`#irc_#football-${username}:${HOMESERVER_NAME}`);
         if (
@@ -447,7 +461,8 @@ async function hardcodedForRetreat() {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
-        channel.activeSubRooms.push({
+        polychat.activeSubRooms.push({
+            network: 'irc',
             ready: new Date(),
             roomId,
             user: {
@@ -462,7 +477,7 @@ async function hardcodedForRetreat() {
 // AppService
 appservice.begin().then(() => {
     console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
-}).then(hardcodedForRetreat);
+});
 
 // API
 api.listen(API_PORT, API_BIND_ADDRESS, () => {
