@@ -14,14 +14,14 @@ import api from './api';
 import { GenericTransformer } from './transformers/generic';
 
 const DEBUG_MXID = process.env.DEBUG_MXID;
-const API_BIND_ADDRESS = process.env.API_BIND_ADDRESS || '127.0.0.1';
-const API_PORT = typeof process.env.API_PORT === 'string' ? Number.parseInt(process.env.API_PORT) : 9999;
+const API_BIND_ADDRESS = process.env.API_BIND_ADDRESS || '0.0.0.0';
+const API_PORT = typeof process.env.API_PORT === 'string' ? Number.parseInt(process.env.API_PORT) : 9998;
 const APPSERVICE_BIND_ADDRESS = process.env.APPSERVICE_BIND_ADDRESS || '127.0.0.1';
 const APPSERVICE_PORT = typeof process.env.APPSERVICE_PORT === 'string' ? Number.parseInt(process.env.APPSERVICE_PORT) : 9999;
 const HOMESERVER_NAME = process.env.HOMESERVER_NAME || 'localhost';
 const HOMESERVER_URL = process.env.HOMESERVER_URL || 'http://localhost:8008';
 const PATH_DATA = process.env.PATH_DATA || './data';
-const PATH_CONFIG = process.env.PATH_CONFIG || './data';
+const PATH_CONFIG = process.env.PATH_CONFIG || './config';
 const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
 const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
 const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
@@ -53,13 +53,14 @@ export type SubRoomUser = {
 });
 
 export type SubRoom = {
+    network: string,
     ready?: Date,
     roomId: string,
     user?: SubRoomUser,
     url?: string,
 }
 
-export type Channel = {
+export type Polychat = {
     name: string,
     avatar?: string,
     mainRoomId: string,
@@ -68,32 +69,35 @@ export type Channel = {
     activeSubRooms: SubRoom[],
 };
 
-const channels: Map<string, Channel> = new Map();
+const polychats: Polychat[] = [];
 
-// subroom
-// whatsapp_
-// Channel_
-
-async function handOutSubRoom(channelId: string, network: string): Promise<string> {
-    const channel = channels.get(channelId);
-    if (!channel) {
-        throw Error('E_CHANNEL_NOT_FOUND');
+async function handOutSubRoom(polychatId: string, network: string): Promise<string> {
+    const polychat = polychats.find(polychat => polychat.mainRoomId === polychatId);
+    if (!polychat) {
+        throw Error('E_POLYCHAT_NOT_FOUND');
     }
-    const subRoom = channel.unclaimedSubRooms.shift();
-    if (!subRoom) {
+    const subRoomIndex = polychat.unclaimedSubRooms.findIndex(subRoom => subRoom.)
+    if (subRoomIndex === -1) {
         throw Error('E_OUT_OF_SUB_ROOMS');
     }
+    const subRoom = polychat.unclaimedSubRooms[subRoomIndex]!;
+    polychat.unclaimedSubRooms.splice(subRoomIndex, 1);
     subRoom.user = {
         localpart: uniqueId('polychat_'),
         identity: 'inherit',
         handOut: new Date(),
     };
-    channel.claimedSubRooms.push(subRoom);
+    const intent = appservice.getIntent(registration.sender_localpart);
+    const userIntent = appservice.getIntent(subRoom.user.localpart);
+    await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, 'de.polychat.room.participant', userIntent.userId, {
+        room_id: subRoom.roomId,
+    });
+    polychat.claimedSubRooms.push(subRoom);
     return subRoom.url!;
 }
 
-function findSubRoom(roomId: string): { channel: Channel, subRoom: SubRoom } | undefined {
-    for (const channel of channels.values()) {
+function findSubRoom(roomId: string): { channel: Polychat, subRoom: SubRoom } | undefined {
+    for (const channel of polychats.values()) {
         const subRoom = [...channel.activeSubRooms].find(r => r.roomId === roomId);
         if (subRoom) {
             return {
@@ -104,16 +108,16 @@ function findSubRoom(roomId: string): { channel: Channel, subRoom: SubRoom } | u
     }
 }
 
-function findMainRoom(roomId: string): Channel | undefined {
-    for (const channel of channels.values()) {
+function findMainRoom(roomId: string): Polychat | undefined {
+    for (const channel of polychats.values()) {
         if (channel.mainRoomId === roomId) {
             return channel;
         }
     }
 }
 
-function pushChannel(channel: Channel): void {
-    channels.set(`c${uniqueId()}`, channel);
+function pushPolychat(channel: Polychat): void {
+    polychats.set(`c${uniqueId()}`, channel);
 }
 
 const ensureDisplayNameInRoom = async (roomId: string, localpart: string, displayName: string) => {
@@ -127,8 +131,8 @@ const ensureDisplayNameInRoom = async (roomId: string, localpart: string, displa
     // }
 };
 
-const getDisplayNameForChannel = async (channel: Channel, subRoom: SubRoom, user: SubRoomUser): Promise<string> => {
-    console.debug('Called getDisplayNameForChannel', channel.mainRoomId, user.localpart);
+const getDisplayNameForPolychat = async (channel: Polychat, subRoom: SubRoom, user: SubRoomUser): Promise<string> => {
+    console.debug('Called getDisplayNameForPolychat', channel.mainRoomId, user.localpart);
     if (user.identity === 'custom') {
         return user.displayName;
     }
@@ -143,12 +147,12 @@ const getDisplayNameForChannel = async (channel: Channel, subRoom: SubRoom, user
     }
 };
 
-const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any): Promise<void> => {
+const onMessageInSubRoom = async (subRoom: SubRoom, channel: Polychat, event: any): Promise<void> => {
     console.debug('Called onMessageInSubRoom', {
         channel: channel.mainRoomId,
         event: event.event_id,
     });
-    const polychatIntent = appservice.getIntent('polychat');
+    const polychatIntent = appservice.getIntent(registration.sender_localpart);
     if (event.sender === polychatIntent.userId) {
         // Ignore echo
         return;
@@ -189,15 +193,15 @@ const onMessageInSubRoom = async (subRoom: SubRoom, channel: Channel, event: any
     }
 
     const intent = appservice.getIntent(user.localpart);
-    await ensureDisplayNameInRoom(channel.mainRoomId, user.localpart, await getDisplayNameForChannel(channel, subRoom, user));
+    await ensureDisplayNameInRoom(channel.mainRoomId, user.localpart, await getDisplayNameForPolychat(channel, subRoom, user));
     console.log('onMessageInSubRoom content', JSON.stringify(event.content));
     await intent.sendEvent(channel.mainRoomId, event.content);
 };
 
 const transformer = new GenericTransformer();
 
-const onMessageInMainRoom = async (channel: Channel, event: any): Promise<void> => {
-    const intent = appservice.getIntent('polychat');
+const onMessageInMainRoom = async (channel: Polychat, event: any): Promise<void> => {
+    const intent = appservice.getIntent(registration.sender_localpart);
     // const senderProfile = (await intent.underlyingClient.getRoomStateEvent(channel.mainRoomId, 'm.room.member', event.sender)).content;
     for (const subRoom of channel.activeSubRooms) {
         if (subRoom.user && event.sender === `@${subRoom.user.localpart}:${HOMESERVER_NAME}`) {
@@ -210,9 +214,8 @@ const onMessageInMainRoom = async (channel: Channel, event: any): Promise<void> 
     }
 };
 
-const createChannel = async (opts: {name: string}): Promise<Channel> => {
-    const intent = appservice.getIntent('polychat');
-    await intent.ensureRegistered();
+export const createPolychat = async (opts: {name: string}): Promise<Polychat> => {
+    const intent = appservice.getIntent(registration.sender_localpart);
 
     const mainRoomId = await intent.underlyingClient.createRoom({
         name: `${opts.name} ${new Date().toISOString()}`,
@@ -222,7 +225,7 @@ const createChannel = async (opts: {name: string}): Promise<Channel> => {
         await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, mainRoomId, 50);
     }
 
-    const channel: Channel = {
+    const channel: Polychat = {
         name: opts.name,
         mainRoomId,
         unclaimedSubRooms: [],
@@ -230,7 +233,7 @@ const createChannel = async (opts: {name: string}): Promise<Channel> => {
         activeSubRooms: [],
     };
 
-    pushChannel(channel);
+    pushPolychat(channel);
 
     createSubRoom({ channel, network: 'irc' });
     createSubRoom({ channel, network: 'irc' });
@@ -238,7 +241,7 @@ const createChannel = async (opts: {name: string}): Promise<Channel> => {
     return channel;
 };
 
-const createSubRoom = async (opts: {channel: Channel, network: string}) => {
+const createSubRoom = async (opts: {channel: Polychat, network: string}) => {
     if (opts.network === 'irc') {
         if (!IRC_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
@@ -270,9 +273,9 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
     const body = event.content.body as string;
     const match = body.match(handOutRegExp);
     if (match) {
-        const polychatIntent = appservice.getIntent('polychat');
+        const polychatIntent = appservice.getIntent(registration.sender_localpart);
         try {
-            const url = await createChannel({ name: match.groups!['name']! })
+            const url = await createPolychat({ name: match.groups!['name']! })
             await polychatIntent.sendText(roomId, ` ${url}`);
         } catch (error: any) {
             await polychatIntent.sendText(roomId, `error ${error.message}`);
@@ -302,7 +305,7 @@ appservice.on('room.message', async (roomId: string, event: any) => {
 
 appservice.on('room.event', async (roomId: string, event: any) => {
     console.debug('room.event', JSON.stringify(event));
-    const polychatIntent = appservice.getIntent('polychat');
+    const polychatIntent = appservice.getIntent(registration.sender_localpart);
     if (event.sender === polychatIntent.userId) {
         // Ignore echo
         // TODO: We want to listen to our own changes, just not the initial sync
@@ -321,7 +324,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         const channel = findMainRoom(roomId);
         if (channel) {
             console.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
-            const intent = appservice.getIntent('polychat');
+            const intent = appservice.getIntent(registration.sender_localpart);
             // TODO: Find display name of user
             for (const subRoom of channel.activeSubRooms) {
                 await intent.underlyingClient.sendNotice(subRoom.roomId, `${event['state_key']} changed to ${event.content.membership}`);
@@ -334,7 +337,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         const channel = findMainRoom(roomId);
         if (channel) {
             console.info(`Main room: name changed ${JSON.stringify(event.content)}`);
-            const intent = appservice.getIntent('polychat');
+            const intent = appservice.getIntent(registration.sender_localpart);
             for (const subRoom of channel.activeSubRooms) {
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
             }
@@ -346,7 +349,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         const channel = findMainRoom(roomId);
         if (channel) {
             console.info(`Main room: avatar changed ${JSON.stringify(event.content)}`);
-            const intent = appservice.getIntent('polychat');
+            const intent = appservice.getIntent(registration.sender_localpart);
             for (const subRoom of channel.activeSubRooms) {
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
             }
@@ -357,11 +360,11 @@ appservice.on('room.event', async (roomId: string, event: any) => {
 // Typically appservices will want to autojoin all rooms
 AutojoinRoomsMixin.setupOnAppservice(appservice);
 
-const intent = appservice.getIntent('polychat');
+const intent = appservice.getIntent(registration.sender_localpart);
 await intent.ensureRegistered();
 
 async function createRooms() {
-    const intent = appservice.getIntent('polychat');
+    const intent = appservice.getIntent(registration.sender_localpart);
     const mainRoomId = await intent.underlyingClient.createRoom({
         name: 'Yoga',
         ...(DEBUG_MXID && {
@@ -369,7 +372,7 @@ async function createRooms() {
         }),
     });
 
-    const channel: Channel = {
+    const channel: Polychat = {
         name: 'Yoga',
         mainRoomId,
         unclaimedSubRooms: [],
@@ -377,7 +380,7 @@ async function createRooms() {
         activeSubRooms: [],
     };
 
-    channels.set('yoga', channel);
+    polychats.set('yoga', channel);
 
     for (let i = 0; i < 4; i++) {
         const roomId = await intent.underlyingClient.createRoom({
@@ -395,8 +398,7 @@ async function createRooms() {
 }
 
 async function hardcodedFootballCreationForChristian() {
-    const intent = appservice.getIntent('polychat');
-    await intent.ensureRegistered();
+    const intent = appservice.getIntent(registration.sender_localpart);
 
     await intent.underlyingClient.createRoom({
         name: 'Football - User A',
@@ -416,8 +418,7 @@ async function hardcodedFootballCreationForChristian() {
 }
 
 async function hardcodedForRetreat() {
-    const intent = appservice.getIntent('polychat');
-    await intent.ensureRegistered();
+    const intent = appservice.getIntent(registration.sender_localpart);
 
     const mainRoomId = await intent.underlyingClient.createRoom({
         name: `Football ${new Date().toISOString()}`,
@@ -427,7 +428,7 @@ async function hardcodedForRetreat() {
         await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, mainRoomId, 50);
     }
 
-    const channel: Channel = {
+    const channel: Polychat = {
         name: 'Football',
         mainRoomId,
         unclaimedSubRooms: [],
@@ -435,7 +436,7 @@ async function hardcodedForRetreat() {
         activeSubRooms: [],
     };
 
-    channels.set('football', channel);
+    polychats.set('football', channel);
     for (const username of ['usera', 'userb']) {
         const roomId = await intent.ensureJoined(`#irc_#football-${username}:${HOMESERVER_NAME}`);
         if (

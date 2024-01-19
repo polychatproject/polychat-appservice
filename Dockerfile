@@ -19,6 +19,8 @@ WORKDIR "/app"
 COPY . /app/
 COPY --from=BUILD /app/node_modules/ node_modules/
 
+# API port
+EXPOSE 9998
 # AppService port
 EXPOSE 9999
 CMD ["bun", "run", "src/index.ts"]
