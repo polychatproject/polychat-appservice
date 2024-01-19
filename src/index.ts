@@ -335,6 +335,7 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
             ready: new Date(),
             roomId,
         });
+        return;
     }
     throw Error(`Network not implemented: ${opts.network}`);
 }
