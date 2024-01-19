@@ -486,7 +486,7 @@ async function hardcodedFootballCreationForChristian() {
 
 async function hardcodedForRetreat() {
     const polychat = await createPolychat({
-        name: 'Harald',
+        name: 'Retreat in Binz',
     });
 
     fillUpSubRoomPool(polychat);
