@@ -166,6 +166,22 @@ const onMessageInSubRoom = async (subRoom: SubRoom, polychat: Polychat, event: a
 
     const handOutRegExp = /^hand out (?<polychatId>[a-z]+?) (?<network>[a-z]+?)$/;
     const body = event.content.body as string;
+
+    // TODO: Remove this debug command
+    if (body === 'claimed') {
+        const subRoomIndex = polychat.unclaimedSubRooms.findIndex(s => s === subRoom);
+        if (subRoomIndex === -1) {
+            throw Error('E_OUT_OF_SUB_ROOMS');
+        }
+        polychat.unclaimedSubRooms.splice(subRoomIndex, 1);
+        subRoom.user = {
+            localpart: uniqueId('polychat_'),
+            identity: 'inherit',
+            handOut: new Date(),
+        };
+        polychat.activeSubRooms.push(subRoom);
+    }
+
     const match = body.match(handOutRegExp);
     if (match) {
         try {
