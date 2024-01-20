@@ -1,10 +1,12 @@
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
-import { createPolychat, fillUpSubRoomPool } from '.';
+import { createPolychat, fillUpSubRoomPool, findMainRoom } from '.';
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
+const API_JOIN_BASE_URL = process.env.API_JOIN_BASE_URL || 'https://join.polychat.de';
 
 const upload = multer({ dest: PATH_UPLOADS });
 
@@ -22,14 +24,14 @@ const allowCrossDomain = function (req: any, res: any, next: any) {
     next();
 };
 
-api.use('/avatars', express.static(PATH_UPLOADS));
+// api.use('/api/', express.static(PATH_UPLOADS));
 
-api.use('/polychat', allowCrossDomain);
+api.use('/api/2024-01', allowCrossDomain);
 
 /**
  * Create a new Polychat.
  */
-api.post('/polychat', upload.single('avatar'), async (req, res) => {
+api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
     if (typeof req.body.name !== 'string') {
         res.status(403).json({
             errcode: 'E_NAME_MISSING',
@@ -42,6 +44,9 @@ api.post('/polychat', upload.single('avatar'), async (req, res) => {
         fillUpSubRoomPool(polychat);
         res.json({
             id: polychat.mainRoomId,
+            adminUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}?admin=true`,
+            joinUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}`,
+            name: polychat.name,
         });
     } catch (error) {
         console.warn('Failed to create Polychat');
@@ -53,9 +58,28 @@ api.post('/polychat', upload.single('avatar'), async (req, res) => {
 });
 
 /**
- * Get an invite link for a bridged channel.
+ * Get the info of a polychat.
  */
-api.post('/channel/:channel/:network', upload.single('avatar'), async (req, res) => {
+api.get('/api/2024-01/polychat/:polychat', (req, res) => {
+    const polychat = findMainRoom(req.params.polychat);
+    if (!polychat) {
+        res.status(403).json({
+            errcode: 'E_CHANNEL_NOT_FOUND',
+        });
+        return;
+    }
+    res.json({
+        id: polychat.mainRoomId,
+        adminUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}?admin=true`,
+        joinUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}`,
+        name: polychat.name,
+    });
+});
+
+/**
+ * Get an invite link for a bridged polychat.
+ */
+api.post('/api/2024-01/polychat/:polychat/:network', upload.single('avatar'), async (req, res) => {
     // Validate params
     if (!['telegram', 'whatsapp'].includes(req.params.network)) {
         res.status(404).json({ errcode: 'E_UNSUPPORTED_NETWORK' });
@@ -83,6 +107,13 @@ api.post('/channel/:channel/:network', upload.single('avatar'), async (req, res)
         url: 'https://chat.whatsapp.com/BzkM4rkDt1m2CxlgWpkbfl',
     });
     return;
+});
+
+api.use(express.static('./public'));
+
+api.get('/:polychatId', async (req, res) => {
+    const html = await fsPromises.readFile('./public/index.html', 'utf-8');
+    res.type('html').end(html);
 });
 
 api.get('/livez', (req, res) => {
