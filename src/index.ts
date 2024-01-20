@@ -6,7 +6,6 @@ import {
     SimpleFsStorageProvider,
     SimpleRetryJoinStrategy,
     AutojoinRoomsMixin,
-    PowerLevelAction,
 } from 'matrix-bot-sdk';
 import { parse as parseYAML } from 'yaml';
 import { uniqueId } from './helper';
@@ -117,7 +116,23 @@ function findSubRoom(roomId: string): { polychat: Polychat, subRoom: SubRoom } |
     }
 }
 
-function findMainRoom(roomId: string): Polychat | undefined {
+function findAnySubRoom(roomId: string): { polychat: Polychat, subRoom: SubRoom } | undefined {
+    for (const polychat of polychats) {
+        const subRoom = [
+            ...polychat.unclaimedSubRooms,
+            ...polychat.claimedSubRooms,
+            ...polychat.activeSubRooms,
+        ].find(r => r.roomId === roomId);
+        if (subRoom) {
+            return {
+                polychat,
+                subRoom,
+            };
+        }
+    }
+}
+
+export function findMainRoom(roomId: string): Polychat | undefined {
     for (const polychat of polychats) {
         if (polychat.mainRoomId === roomId) {
             return polychat;
@@ -143,7 +158,7 @@ const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, u
     }
     const intent = appservice.getIntent(user.localpart);
     try {
-        // TODO: The
+        // TODO: The event is sometimes not found
         const state = (await intent.underlyingClient.getRoomStateEvent(subRoom.roomId, 'm.room.member', intent.userId));
         return state.displayname;
     } catch (error) {
@@ -228,6 +243,31 @@ const onMessageInSubRoom = async (subRoom: SubRoom, polychat: Polychat, event: a
 };
 
 const transformer = new GenericTransformer();
+
+const catchTelegramInviteLinks = async (roomId: string, event: any): Promise<void> => {
+    if (event.content.msgtype !== 'notice') {
+        return;
+    }
+    const body = event.content.body as unknown;
+    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
+        return;
+    }
+    const subRoomInfo = findAnySubRoom(roomId);
+    if (!subRoomInfo) {
+        return;
+    }
+    const { polychat, subRoom } = subRoomInfo;
+    const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
+    if (event.sender !== polychatIntent.userId) {
+        return;
+    }
+    const match = body.match(/: (?<link>https:\/\/t\.me\/\+[a-zA-Z0-9]+)$/);
+    if (!match) {
+        return;
+    }
+    const inviteLink = match.groups['link'];
+    subRoom.url = inviteLink;
+};
 
 const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void> => {
     const intent = appservice.getIntent(registration.sender_localpart);
@@ -354,20 +394,28 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
             name: opts.polychat.name,
         });
         if (DEBUG_MXID) {
+            console.log(`createSubRoom: Invite DEBUG_MXID to ${roomId}`);
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
+        console.log(`createSubRoom: Invite TELEGRAM_BRIDGE_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_MXID, roomId);
         // The Telegram bot wants to be able to redact events
+
+        console.log(`createSubRoom: Set power level of TELEGRAM_BRIDGE_MXID to 50 in ${roomId}`);
         await intent.underlyingClient.setUserPowerLevel(TELEGRAM_BRIDGE_MXID, roomId, 50);
+        console.log(`createSubRoom: Invite TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_TUG_MXID, roomId);
         const tugIntent = appservice.getIntentForUserId(TELEGRAM_BRIDGE_TUG_MXID);
+        console.log(`createSubRoom: Join as TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
         await tugIntent.underlyingClient.joinRoom(roomId);
         // TODO: Wait for join, then set up link
         setTimeout(() => {
+            console.log(`createSubRoom: Send "create group" command to ${roomId}`);
             intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} create group`);
             // TODO: Wait for link, then get invite link
             setTimeout(() => {
+                console.log(`createSubRoom: Send "invite-link" to ${roomId}`);
                 intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} invite-link`);
                 tugIntent.underlyingClient.leaveRoom(roomId);
             }, 15000);
@@ -417,6 +465,8 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
 // Attach listeners here
 appservice.on('room.message', async (roomId: string, event: any) => {
     if (!event['content']?.['msgtype']) return;
+
+    await catchTelegramInviteLinks(roomId, event);
 
     const subRoomInfo = findSubRoom(roomId);
     if (subRoomInfo) {
@@ -500,45 +550,6 @@ appservice.on('room.event', async (roomId: string, event: any) => {
     }
 });
 
-// Typically appservices will want to autojoin all rooms
-AutojoinRoomsMixin.setupOnAppservice(appservice);
-
-async function createRooms() {
-    const intent = appservice.getIntent(registration.sender_localpart);
-    const mainRoomId = await intent.underlyingClient.createRoom({
-        name: 'Yoga',
-        ...(DEBUG_MXID && {
-            invite: [DEBUG_MXID],
-        }),
-    });
-
-    const polychat: Polychat = {
-        name: 'Yoga',
-        mainRoomId,
-        unclaimedSubRooms: [],
-        claimedSubRooms: [],
-        activeSubRooms: [],
-    };
-
-    polychats.push(polychat);
-
-    for (let i = 0; i < 4; i++) {
-        const roomId = await intent.underlyingClient.createRoom({
-            name: 'Yoga',
-            room_alias_name: `irc_#yoga-user${i}`,
-            ...(DEBUG_MXID && {
-                invite: [DEBUG_MXID],
-            }),
-        });
-        polychat.unclaimedSubRooms.push({
-            network: 'irc',
-            polychatUserId: intent.userId,
-            ready: new Date(),
-            roomId,
-        });
-    }
-}
-
 async function hardcodedFootballCreationForChristian() {
     const intent = appservice.getIntent(registration.sender_localpart);
 
@@ -594,6 +605,8 @@ async function main() {
     await intent.ensureRegistered();
     
     // AppService
+    // Typically appservices will want to autojoin all rooms
+    AutojoinRoomsMixin.setupOnAppservice(appservice);
     appservice.begin().then(() => {
         console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
         api.set('ready', true);
