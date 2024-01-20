@@ -220,7 +220,11 @@ const onMessageInSubRoom = async (subRoom: SubRoom, polychat: Polychat, event: a
     const intent = appservice.getIntent(user.localpart);
     await ensureDisplayNameInRoom(polychat.mainRoomId, user.localpart, await getDisplayNameForPolychat(polychat, subRoom, user));
     console.log('onMessageInSubRoom content', JSON.stringify(event.content));
-    await intent.sendEvent(polychat.mainRoomId, event.content);
+
+    const cleanedContent = { ...event.content };
+    delete cleanedContent['fi.mau.telegram.source'];
+    
+    await intent.sendEvent(polychat.mainRoomId, cleanedContent);
 };
 
 const transformer = new GenericTransformer();
@@ -579,11 +583,29 @@ async function main() {
     // AppService
     appservice.begin().then(() => {
         console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
+        api.set('ready', true);
+        api.set('live', true);
     });
     
     // API
-    api.listen(API_PORT, API_BIND_ADDRESS, () => {
+    const apiServer = api.listen(API_PORT, API_BIND_ADDRESS, () => {
         console.info(`API: Listening on ${API_BIND_ADDRESS}:${API_PORT}`);
+    });
+
+    process.once('SIGTERM', () => {
+        console.error('Got SIGTERM');
+        try {
+            appservice.stop();
+            console.log('AppService: HTTP server closed');
+            apiServer.close(() => {
+                console.log('API: HTTP server closed');
+                process.exit(0);
+            });
+        } catch (error) {
+            console.error("Failed to shut down");
+            console.error(error);
+            process.exit(1);
+        }
     });
 }
 
