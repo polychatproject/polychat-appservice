@@ -336,12 +336,12 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         // TODO: Wait for join, then set up link
         setTimeout(() => {
             intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} create group`);
+            // TODO: Wait for link, then get invite link
             setTimeout(() => {
                 intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} invite-link`);
                 tugIntent.underlyingClient.leaveRoom(roomId);
             }, 15000);
         }, 15000);
-        // TODO: Get invite link
 
         opts.polychat.unclaimedSubRooms.push({
             network: opts.network,
