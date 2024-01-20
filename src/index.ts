@@ -328,6 +328,8 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_MXID, roomId);
+        // The Telegram bot wants to be able to redact events
+        await intent.underlyingClient.setUserPowerLevel(TELEGRAM_BRIDGE_MXID, roomId, 50);
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_TUG_MXID, roomId);
         const tugIntent = appservice.getIntentForUserId(TELEGRAM_BRIDGE_TUG_MXID);
         await tugIntent.underlyingClient.joinRoom(roomId);
@@ -335,6 +337,7 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         setTimeout(() => {
             intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} create group`);
             setTimeout(() => {
+                intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} invite-link`);
                 tugIntent.underlyingClient.leaveRoom(roomId);
             }, 15000);
         }, 15000);
