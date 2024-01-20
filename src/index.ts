@@ -453,11 +453,24 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         // Main room: Member joined or left
         const polychat = findMainRoom(roomId);
         if (polychat) {
+            let msg = '';
+            if (event.content.membership === 'join') {
+                msg = `${event['state_key']} joined.`;
+            }
+            if (event.content.membership === 'leave') {
+                msg = `${event['state_key']} left.`;
+            }
+            if (event.content.membership === 'ban') {
+                msg = `${event['state_key']} got banned.`;
+            }
+            if (!msg) {
+                return;
+            }
             console.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
             // TODO: Find display name of user
             for (const subRoom of polychat.activeSubRooms) {
                 const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
-                await intent.underlyingClient.sendNotice(subRoom.roomId, `${event['state_key']} changed to ${event.content.membership}`);
+                await intent.underlyingClient.sendNotice(subRoom.roomId, msg);
             }
         }
     }
