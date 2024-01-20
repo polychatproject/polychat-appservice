@@ -537,7 +537,7 @@ async function main() {
     // AppService
     appservice.begin().then(() => {
         console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
-    }).then(hardcodedForRetreat);
+    });
     
     // API
     api.listen(API_PORT, API_BIND_ADDRESS, () => {
