@@ -27,6 +27,7 @@ const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
 const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
 const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
 const TELEGRAM_BRIDGE_MXID = process.env.TELEGRAM_BRIDGE_MXID;
+const TELEGRAM_BRIDGE_ACCOUNT_MXIDS = typeof process.env.TELEGRAM_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.TELEGRAM_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
 const TELEGRAM_BRIDGE_TUG_MXID = process.env.TELEGRAM_BRIDGE_TUG_MXID;
 const TELEGRAM_BRIDGE_COMMAND_PREFIX = process.env.TELEGRAM_BRIDGE_COMMAND_PREFIX || '!tg';
 
@@ -60,6 +61,7 @@ export type SubRoomUser = {
 });
 
 export type SubRoom = {
+    polychatUserId: string,
     network: string,
     ready?: Date,
     roomId: string,
@@ -139,12 +141,13 @@ const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, u
     if (user.identity === 'custom') {
         return user.displayName;
     }
-    const mxid = `@${user.localpart}:${HOMESERVER_NAME}`;
+    const intent = appservice.getIntent(user.localpart);
     try {
-        const state = (await intent.underlyingClient.getRoomStateEvent(subRoom.roomId, 'm.room.member', mxid));
+        // TODO: The
+        const state = (await intent.underlyingClient.getRoomStateEvent(subRoom.roomId, 'm.room.member', intent.userId));
         return state.displayname;
     } catch (error) {
-        console.error(`Error fetching the displayname of ${mxid} in the sub room ${subRoom.roomId}.`);
+        console.error(`Error fetching the displayname of ${intent.userId} in the sub room ${subRoom.roomId}.`);
         console.error(error);
         return 'Polychat user';
     }
@@ -208,13 +211,14 @@ const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void
     const userProfile = await intent.underlyingClient.getRoomStateEvent(polychat.mainRoomId, 'm.room.member', event.sender);
     // const senderProfile = (await intent.underlyingClient.getRoomStateEvent(polychat.mainRoomId, 'm.room.member', event.sender)).content;
     for (const subRoom of polychat.activeSubRooms) {
-        if (subRoom.user && event.sender === `@${subRoom.user.localpart}:${HOMESERVER_NAME}`) {
+        if (subRoom.user && event.sender === appservice.getIntent(subRoom.user.localpart)) {
             // Don't send echo
             continue;
         }
         const { content } = await transformer.transformEventForNetwork(polychat, userProfile, event);
         console.log('onMessageInMainRoom content', JSON.stringify(content));
-        intent.sendEvent(subRoom.roomId, content);
+        const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
+        polychatIntent.sendEvent(subRoom.roomId, content);
     }
 };
 
@@ -277,6 +281,7 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         if (!IRC_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
         }
+        const intent = appservice.getIntent(registration.sender_localpart);
         const roomId = await intent.underlyingClient.createRoom({
             name: opts.polychat.name,
         });
@@ -299,6 +304,7 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         
         opts.polychat.unclaimedSubRooms.push({
             network: opts.network,
+            polychatUserId: intent.userId,
             ready: new Date(),
             roomId,
         });
@@ -307,9 +313,13 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
         if (!TELEGRAM_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
         }
+        if (TELEGRAM_BRIDGE_ACCOUNT_MXIDS.length === 0) {
+            throw Error(`TELEGRAM_BRIDGE_ACCOUNT_MXIDS required to open Telegram sub rooms`);
+        }
         if (!TELEGRAM_BRIDGE_TUG_MXID) {
             throw Error(`TELEGRAM_BRIDGE_TUG_MXID required to open Telegram sub rooms`);
         }
+        const intent = appservice.getIntentForUserId(TELEGRAM_BRIDGE_ACCOUNT_MXIDS[0]!);
         const roomId = await intent.underlyingClient.createRoom({
             name: opts.polychat.name,
         });
@@ -332,6 +342,7 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
 
         opts.polychat.unclaimedSubRooms.push({
             network: opts.network,
+            polychatUserId: intent.userId,
             ready: new Date(),
             roomId,
         });
@@ -397,9 +408,9 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         const polychat = findMainRoom(roomId);
         if (polychat) {
             console.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
-            const intent = appservice.getIntent(registration.sender_localpart);
             // TODO: Find display name of user
             for (const subRoom of polychat.activeSubRooms) {
+                const intent = appservice.getIntent(subRoom.polychatUserId);
                 await intent.underlyingClient.sendNotice(subRoom.roomId, `${event['state_key']} changed to ${event.content.membership}`);
             }
         }
@@ -410,8 +421,8 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         const polychat = findMainRoom(roomId);
         if (polychat) {
             console.info(`Main room: name changed ${JSON.stringify(event.content)}`);
-            const intent = appservice.getIntent(registration.sender_localpart);
             for (const subRoom of polychat.activeSubRooms) {
+                const intent = appservice.getIntent(subRoom.polychatUserId);
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
             }
         }
@@ -422,8 +433,8 @@ appservice.on('room.event', async (roomId: string, event: any) => {
         const polychat = findMainRoom(roomId);
         if (polychat) {
             console.info(`Main room: avatar changed ${JSON.stringify(event.content)}`);
-            const intent = appservice.getIntent(registration.sender_localpart);
             for (const subRoom of polychat.activeSubRooms) {
+                const intent = appservice.getIntent(subRoom.polychatUserId);
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
             }
         }
@@ -432,9 +443,6 @@ appservice.on('room.event', async (roomId: string, event: any) => {
 
 // Typically appservices will want to autojoin all rooms
 AutojoinRoomsMixin.setupOnAppservice(appservice);
-
-const intent = appservice.getIntent(registration.sender_localpart);
-await intent.ensureRegistered();
 
 async function createRooms() {
     const intent = appservice.getIntent(registration.sender_localpart);
@@ -465,6 +473,7 @@ async function createRooms() {
         });
         polychat.unclaimedSubRooms.push({
             network: 'irc',
+            polychatUserId: intent.userId,
             ready: new Date(),
             roomId,
         });
@@ -521,12 +530,19 @@ async function hardcodedForRetreat() {
     // }
 }
 
-// AppService
-appservice.begin().then(() => {
-    console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
-}).then(hardcodedForRetreat);
+async function main() {
+    const intent = appservice.getIntent(registration.sender_localpart);
+    await intent.ensureRegistered();
+    
+    // AppService
+    appservice.begin().then(() => {
+        console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
+    }).then(hardcodedForRetreat);
+    
+    // API
+    api.listen(API_PORT, API_BIND_ADDRESS, () => {
+        console.info(`API: Listening on ${API_BIND_ADDRESS}:${API_PORT}`);
+    });
+}
 
-// API
-api.listen(API_PORT, API_BIND_ADDRESS, () => {
-    console.info(`API: Listening on ${API_BIND_ADDRESS}:${API_PORT}`);
-});
+main();
