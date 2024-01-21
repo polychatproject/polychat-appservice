@@ -257,8 +257,7 @@ const catchTelegramInviteLinks = async (roomId: string, event: any): Promise<voi
         return;
     }
     const { polychat, subRoom } = subRoomInfo;
-    const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
-    if (event.sender !== polychatIntent.userId) {
+    if (event.sender !== TELEGRAM_BRIDGE_MXID) {
         return;
     }
     const match = body.match(/: (?<link>https:\/\/t\.me\/\+[a-zA-Z0-9]+)$/);
