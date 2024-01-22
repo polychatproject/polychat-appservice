@@ -23,12 +23,16 @@ const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_CONFIG = process.env.PATH_CONFIG || './config';
 const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
 const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
-const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
 const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
+const SIGNAL_BRIDGE_ACCOUNT_MXIDS = typeof process.env.SIGNAL_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.SIGNAL_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
+const SIGNAL_BRIDGE_COMMAND_PREFIX = process.env.SIGNAL_BRIDGE_COMMAND_PREFIX || '!signal';
 const TELEGRAM_BRIDGE_MXID = process.env.TELEGRAM_BRIDGE_MXID;
 const TELEGRAM_BRIDGE_ACCOUNT_MXIDS = typeof process.env.TELEGRAM_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.TELEGRAM_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
 const TELEGRAM_BRIDGE_TUG_MXID = process.env.TELEGRAM_BRIDGE_TUG_MXID;
 const TELEGRAM_BRIDGE_COMMAND_PREFIX = process.env.TELEGRAM_BRIDGE_COMMAND_PREFIX || '!tg';
+const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
+const WHATSAPP_BRIDGE_ACCOUNT_MXIDS = typeof process.env.WHATSAPP_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.WHATSAPP_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
+const WHATSAPP_BRIDGE_COMMAND_PREFIX = process.env.WHATSAPP_BRIDGE_COMMAND_PREFIX || '!wa';
 
 console.debug('IRC_BRIDGE_MXID', IRC_BRIDGE_MXID);
 console.debug('SIGNAL_BRIDGE_MXID', SIGNAL_BRIDGE_MXID);
@@ -377,6 +381,54 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
                 avatar: '',
             },
         });
+        return;  
+    } else if (opts.network === 'signal') {
+        if (!SIGNAL_BRIDGE_MXID) {
+            throw Error(`Network not configured: ${opts.network}`);
+        }
+        if (SIGNAL_BRIDGE_ACCOUNT_MXIDS.length === 0) {
+            throw Error(`SIGNAL_BRIDGE_ACCOUNT_MXIDS required to open WhatsApp sub rooms`);
+        }
+        const intent = appservice.getIntentForUserId(SIGNAL_BRIDGE_ACCOUNT_MXIDS[0]!);
+        const roomId = await intent.underlyingClient.createRoom({
+            name: opts.polychat.name,
+        });
+        if (DEBUG_MXID) {
+            console.log(`createSubRoom: Invite DEBUG_MXID to ${roomId}`);
+            await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
+            await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
+        }
+        console.log(`createSubRoom: Invite SIGNAL_BRIDGE_MXID to ${roomId}`);
+        await intent.underlyingClient.inviteUser(SIGNAL_BRIDGE_MXID, roomId);
+        // The Telegram bot wants to be able to redact events
+
+        console.log(`createSubRoom: Set power level of SIGNAL_BRIDGE_MXID to 50 in ${roomId}`);
+        await intent.underlyingClient.setUserPowerLevel(SIGNAL_BRIDGE_MXID, roomId, 50);
+        console.log(`createSubRoom: Join as SIGNAL_BRIDGE_TUG_MXID to ${roomId}`);
+        // TODO: Wait for join, then set up link
+        setTimeout(() => {
+            console.log(`createSubRoom: Send "create group" command to ${roomId}`);
+            intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} create`);
+            // TODO: Wait for link, then get invite link
+            setTimeout(() => {
+                console.log(`createSubRoom: Send "invite-link" to ${roomId}`);
+                intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} invite-link`);
+            }, 15000);
+        }, 15000);
+
+        opts.polychat.activeSubRooms.push({
+            network: opts.network,
+            polychatUserId: intent.userId,
+            ready: new Date(),
+            roomId,
+            user: {
+                localpart: uniqueId('polychat_'),
+                handOut: new Date(),
+                identity: 'custom',
+                displayName: 'Polychat user',
+                avatar: '',
+            },
+        });
         return;
     } else if (opts.network === 'telegram') {
         if (!TELEGRAM_BRIDGE_MXID) {
@@ -417,6 +469,54 @@ const createSubRoom = async (opts: {polychat: Polychat, network: string}) => {
                 console.log(`createSubRoom: Send "invite-link" to ${roomId}`);
                 intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} invite-link`);
                 tugIntent.underlyingClient.leaveRoom(roomId);
+            }, 15000);
+        }, 15000);
+
+        opts.polychat.activeSubRooms.push({
+            network: opts.network,
+            polychatUserId: intent.userId,
+            ready: new Date(),
+            roomId,
+            user: {
+                localpart: uniqueId('polychat_'),
+                handOut: new Date(),
+                identity: 'custom',
+                displayName: 'Polychat user',
+                avatar: '',
+            },
+        });
+        return;
+    } else if (opts.network === 'whatsapp') {
+        if (!WHATSAPP_BRIDGE_MXID) {
+            throw Error(`Network not configured: ${opts.network}`);
+        }
+        if (WHATSAPP_BRIDGE_ACCOUNT_MXIDS.length === 0) {
+            throw Error(`WHATSAPP_BRIDGE_ACCOUNT_MXIDS required to open WhatsApp sub rooms`);
+        }
+        const intent = appservice.getIntentForUserId(WHATSAPP_BRIDGE_ACCOUNT_MXIDS[0]!);
+        const roomId = await intent.underlyingClient.createRoom({
+            name: opts.polychat.name,
+        });
+        if (DEBUG_MXID) {
+            console.log(`createSubRoom: Invite DEBUG_MXID to ${roomId}`);
+            await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
+            await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
+        }
+        console.log(`createSubRoom: Invite WHATSAPP_BRIDGE_MXID to ${roomId}`);
+        await intent.underlyingClient.inviteUser(WHATSAPP_BRIDGE_MXID, roomId);
+        // The Telegram bot wants to be able to redact events
+
+        console.log(`createSubRoom: Set power level of WHATSAPP_BRIDGE_MXID to 50 in ${roomId}`);
+        await intent.underlyingClient.setUserPowerLevel(WHATSAPP_BRIDGE_MXID, roomId, 50);
+        console.log(`createSubRoom: Join as WHATSAPP_BRIDGE_TUG_MXID to ${roomId}`);
+        // TODO: Wait for join, then set up link
+        setTimeout(() => {
+            console.log(`createSubRoom: Send "create group" command to ${roomId}`);
+            intent.underlyingClient.sendText(roomId, `${WHATSAPP_BRIDGE_COMMAND_PREFIX} create`);
+            // TODO: Wait for link, then get invite link
+            setTimeout(() => {
+                console.log(`createSubRoom: Send "invite-link" to ${roomId}`);
+                intent.underlyingClient.sendText(roomId, `${WHATSAPP_BRIDGE_COMMAND_PREFIX} invite-link`);
             }, 15000);
         }, 15000);
 

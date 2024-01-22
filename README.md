@@ -22,11 +22,16 @@ bun run start
 
 * `IRC_BRIDGE_MXID` - The Matrix User ID of the IRC bridge.
 * `IRC_BRIDGE_SERVER` - The IRC server name on the IRC bridge, e.g. "inspircd".
-* `WHATSAPP_BRIDGE_MXID` - The Matrix User ID of the WhatsApp bridge.
 * `SIGNAL_BRIDGE_MXID` - The Matrix User ID of the Signal bridge.
-* `TELEGRAM_BRIDGE_MXID` - The Matrix User ID of the Telegram bridge. Needs to be registered with the Teöegram bridge.
-* `TELEGRAM_BRIDGE_TUG_MXID` - A 2nd Matrix User ID used for opening a chat group (requires 2 users). Needs to be registered with the Teöegram bridge.
+* `SIGNAL_BRIDGE_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs which have a linked Signal account. They will be the "Polychat" account talking to Signal users.
+* `SIGNAL_BRIDGE_COMMAND_PREFIX` - How to address the Signal bridge bot? Defaults to "!signal".
+* `TELEGRAM_BRIDGE_MXID` - The Matrix User ID of the Telegram bridge. Needs to be registered with the Telegram bridge.
+* `TELEGRAM_BRIDGE_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs which have a linked Telegram account. They will be the "Polychat" account talking to Telegram users.
+* `TELEGRAM_BRIDGE_TUG_MXID` - A 2nd Matrix User ID used for opening a chat group (requires 2 users). Needs to be registered with the Telegram bridge.
 * `TELEGRAM_BRIDGE_COMMAND_PREFIX` - How to address the Telegram bridge bot? Defaults to "!tg".
+* `WHATSAPP_BRIDGE_MXID` - The Matrix User ID of the WhatsApp bridge.
+* `WHATSAPP_BRIDGE_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs which have a linked WhatsApp account. They will be the "Polychat" account talking to WhatsApp users.
+* `WHATSAPP_BRIDGE_COMMAND_PREFIX` - How to address the WhatsApp bridge bot? Defaults to "!wa".
 
 ## Documentation
 
