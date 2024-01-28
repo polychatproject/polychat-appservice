@@ -6,6 +6,7 @@ import {
     SimpleFsStorageProvider,
     SimpleRetryJoinStrategy,
     AutojoinRoomsMixin,
+    MatrixClient,
 } from 'matrix-bot-sdk';
 import { parse as parseYAML } from 'yaml';
 import { uniqueId } from './helper';
@@ -724,9 +725,20 @@ async function hardcodedForRetreat() {
     fillUpSubRoomPool();
 }
 
+async function safelyGetRoomStateEvent(client: MatrixClient, roomId: string, type: string, stateKey: string): Promise<Record<string, any> | undefined> {
+    try {
+        return await client.getRoomStateEvent(roomId, type, stateKey);
+    } catch (error: any) {
+        if (error?.errcode === 'M_NOT_FOUND') {
+            return;
+        }
+        throw error;
+    }
+}
+
 async function loadExistingRooms() {
     console.info('Called loadExistingRooms');
-    console.warn('loadExistingRooms DOES NOT ACTUALLY WORK YET');
+    console.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
     const intents = [
         appservice.getIntent(registration.sender_localpart),
         ...SIGNAL_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
@@ -741,10 +753,10 @@ async function loadExistingRooms() {
         console.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
         for (const roomId of joinedRooms) {
             try {
-                const roomState = await intent.underlyingClient.getRoomStateEvent(roomId, PolychatStateEventType.room, '');
-                const nameState = await intent.underlyingClient.getRoomStateEvent(roomId, 'm.room.name', '');
-                const tombstoneState = await intent.underlyingClient.getRoomStateEvent(roomId, 'm.room.tombstone', '');
-                if (tombstoneState.replacement_room) {
+                const roomState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, PolychatStateEventType.room, '');
+                const nameState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, 'm.room.name', '');
+                const tombstoneState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, 'm.room.tombstone', '');
+                if (tombstoneState?.replacement_room) {
                     console.log(`Ignore existing room ${roomId} because it has a tombstone and got replaced by ${tombstoneState.replacement_room}`);
                     continue;
                 }
@@ -752,7 +764,7 @@ async function loadExistingRooms() {
                     // TODO: Add `ready`
                     const polychat: Polychat = {
                         mainRoomId: roomId,
-                        name: nameState.name,
+                        name: nameState?.name, // TODO Could be undefined
                         subRooms: [],
                     };
                     console.debug('Found an existing Polychat / Main Room', polychat);
@@ -782,6 +794,8 @@ async function loadExistingRooms() {
         }
     }
     // TODO: Link Main Rooms and Sub Rooms
+
+    polychats.push(...allPolychats);
 
     console.info(`Done loadExistingRooms: Found ${allPolychats.length} main rooms, ${allSubRooms.length} sub rooms and ${allControlRooms.length} control rooms`);
 }
