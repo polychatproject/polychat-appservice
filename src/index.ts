@@ -90,6 +90,12 @@ export type UnclaimedSubRoom = {
     inviteUrl?: string,
 };
 
+export type ControlRoom = {
+    network: string,
+    ready?: Date,
+    roomId: string,
+};
+
 export type ClaimedSubRoom = UnclaimedSubRoom & {
     claimed: Date,
     user: SubRoomUser,
@@ -506,7 +512,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_TUG_MXID, roomId);
         const tugIntent = appservice.getIntentForUserId(TELEGRAM_BRIDGE_TUG_MXID);
         console.log(`createSubRoom: Join as TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
-        await tugIntent.underlyingClient.joinRoom(roomId);
+        await tugIntent.joinRoom(roomId);
         // TODO: Wait for join, then set up link
         setTimeout(() => {
             console.log(`createSubRoom: Send "create group" command to ${roomId}`);
@@ -515,7 +521,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
             setTimeout(() => {
                 console.log(`createSubRoom: Send "invite-link" to ${roomId}`);
                 intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} invite-link`);
-                tugIntent.underlyingClient.leaveRoom(roomId);
+                tugIntent.leaveRoom(roomId);
             }, 15000);
         }, 15000);
 
@@ -718,6 +724,68 @@ async function hardcodedForRetreat() {
     fillUpSubRoomPool();
 }
 
+async function loadExistingRooms() {
+    console.info('Called loadExistingRooms');
+    console.warn('loadExistingRooms DOES NOT ACTUALLY WORK YET');
+    const intents = [
+        appservice.getIntent(registration.sender_localpart),
+        ...SIGNAL_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
+        ...TELEGRAM_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
+        ...WHATSAPP_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
+    ];
+    const allSubRooms: SubRoom[] = [];
+    const allPolychats: Polychat[] = [];
+    const allControlRooms: ControlRoom[] = [];
+    for (const intent of intents) {
+        const joinedRooms = await intent.getJoinedRooms();
+        console.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
+        for (const roomId of joinedRooms) {
+            try {
+                const roomState = await intent.underlyingClient.getRoomStateEvent(roomId, PolychatStateEventType.room, '');
+                const nameState = await intent.underlyingClient.getRoomStateEvent(roomId, 'm.room.name', '');
+                const tombstoneState = await intent.underlyingClient.getRoomStateEvent(roomId, 'm.room.tombstone', '');
+                if (tombstoneState.replacement_room) {
+                    console.log(`Ignore existing room ${roomId} because it has a tombstone and got replaced by ${tombstoneState.replacement_room}`);
+                    continue;
+                }
+                if (roomState?.content?.type === 'main') {
+                    // TODO: Add `ready`
+                    const polychat: Polychat = {
+                        mainRoomId: roomId,
+                        name: nameState.name,
+                        subRooms: [],
+                    };
+                    console.debug('Found an existing Polychat / Main Room', polychat);
+                    allPolychats.push(polychat);
+                } else if (roomState?.content?.type === 'sub') {
+                    // TODO: Add `ready`
+                    const subRoom: SubRoom = {
+                        network: roomState.network,
+                        polychatUserId: intent.userId,
+                        roomId,
+                    };
+                    console.debug('Found an existing Sub Room', subRoom);
+                    allSubRooms.push(subRoom);
+                } else if (roomState?.content?.type === 'control') {
+                    // TODO: Add `ready`
+                    const controlRoom: ControlRoom = {
+                        network: roomState.network,
+                        roomId,
+                    };
+                    console.debug('Found an existing Control Room', controlRoom);
+                    allControlRooms.push(controlRoom);
+                }
+            } catch (error) {
+                console.warn('Failed to load potential Polychat room.');
+                console.warn(error);
+            }
+        }
+    }
+    // TODO: Link Main Rooms and Sub Rooms
+
+    console.info(`Done loadExistingRooms: Found ${allPolychats.length} main rooms, ${allSubRooms.length} sub rooms and ${allControlRooms.length} control rooms`);
+}
+
 async function main() {
     const intent = appservice.getIntent(registration.sender_localpart);
     await intent.ensureRegistered();
@@ -725,8 +793,9 @@ async function main() {
     // AppService
     // Typically appservices will want to autojoin all rooms
     AutojoinRoomsMixin.setupOnAppservice(appservice);
-    appservice.begin().then(() => {
+    appservice.begin().then(async () => {
         console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
+        await loadExistingRooms();
         api.set('ready', true);
         api.set('live', true);
     });
