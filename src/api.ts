@@ -2,7 +2,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
-import { createPolychat, fillUpSubRoomPool, findMainRoom } from '.';
+import { claimSubRoom, createPolychat, fillUpSubRoomPool, findMainRoom } from '.';
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
@@ -74,6 +74,44 @@ api.get('/api/2024-01/polychat/:polychat', (req, res) => {
         joinUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}`,
         name: polychat.name,
     });
+});
+
+/**
+ * Claim a sub room
+ */
+api.get('/api/2024-01/sub-room', async (req, res) => {
+    const mainRoomId = req.query.polychat?.toString();
+    const network = req.query.network?.toString();
+    if (!mainRoomId) {
+        res.status(403).json({
+            errcode: 'E_MAIN_ROOM_MISSING',
+        });
+        return;
+    }
+    if (!network) {
+        res.status(403).json({
+            errcode: 'E_NETWORK_MISSING',
+        });
+        return;
+    }
+    const polychat = findMainRoom(mainRoomId);
+    if (!polychat) {
+        res.status(403).json({
+            errcode: 'E_CHANNEL_NOT_FOUND',
+        });
+        return;
+    }
+    try {
+        const inviteUrl = await claimSubRoom(polychat, network as any);
+        res.json({
+            url: inviteUrl,
+        });
+    } catch (error) {
+        res.status(500).json({
+            errcode: 'E_UNKNOWN',
+        });
+        return;
+    }
 });
 
 /**

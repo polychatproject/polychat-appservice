@@ -119,7 +119,7 @@ const unclaimedSubRooms: Map<Network, SubRoom[]> = new Map([
     ['whatsapp', []],
 ]);
 
-async function claimSubRoom(polychat: Polychat, network: Network, userDisplayName?: string): Promise<string> {
+export async function claimSubRoom(polychat: Polychat, network: Network, userDisplayName?: string): Promise<string> {
     const unclaimedSubRoomsForThisNetwork = unclaimedSubRooms.get(network);
     if (!Array.isArray(unclaimedSubRoomsForThisNetwork)) {
         throw Error('E_NO_SUB_ROOM_FOR_THIS_NETWORK');
