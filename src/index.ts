@@ -84,10 +84,25 @@ export type SubRoomUser = {
 });
 
 export type UnclaimedSubRoom = {
+    /**
+     * The MXID of the Polychat Bot
+     */
     polychatUserId: string,
+    /**
+     * The network ID, e.g. "whatsapp"
+     */
     network: string,
+    /**
+     * Is this room ready to be claimed?
+     */
     ready?: Date,
+    /**
+     * The Matrix room ID
+     */
     roomId: string,
+    /**
+     * A URL we can give to the Polychat user for them to join the chat
+     */
     inviteUrl?: string,
 };
 
@@ -112,19 +127,36 @@ export type Polychat = {
 };
 
 const polychats: Polychat[] = [];
-const unclaimedSubRooms: Map<Network, SubRoom[]> = new Map([
+export const unclaimedSubRooms: Map<Network, UnclaimedSubRoom[]> = new Map([
     ['irc', []],
     ['signal', []],
     ['telegram', []],
     ['whatsapp', []],
 ]);
 
+export function getEnabledNetworks(): string[] {
+    const networks: string[] = [];
+    if (IRC_BRIDGE_MXID) {
+        networks.push('irc');
+    }
+    if (SIGNAL_BRIDGE_MXID) {
+        networks.push('signal');
+    }
+    if (TELEGRAM_BRIDGE_MXID) {
+        networks.push('telegram');
+    }
+    if (WHATSAPP_BRIDGE_MXID) {
+        networks.push('whatsapp');
+    }
+    return networks;
+}
+
 export async function claimSubRoom(polychat: Polychat, network: Network, userDisplayName?: string): Promise<string> {
     const unclaimedSubRoomsForThisNetwork = unclaimedSubRooms.get(network);
     if (!Array.isArray(unclaimedSubRoomsForThisNetwork)) {
         throw Error('E_NO_SUB_ROOM_FOR_THIS_NETWORK');
     }
-    const subRoomIndex = unclaimedSubRoomsForThisNetwork.findIndex(subRoom => subRoom.roomId);
+    const subRoomIndex = unclaimedSubRoomsForThisNetwork.findIndex(subRoom => subRoom.ready && subRoom.inviteUrl);
     if (subRoomIndex === -1) {
         throw Error('E_OUT_OF_SUB_ROOMS');
     }
@@ -145,8 +177,10 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     };
     const intent = appservice.getIntent(registration.sender_localpart);
     const userIntent = appservice.getIntent(claimedSubRoom.user.localpart);
-    await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, userIntent.userId, {
+    // TODO Rethink what the state key should be. It's not allowed to be an MXID.
+    await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, subRoom.roomId, {
         room_id: subRoom.roomId,
+        user_id: userIntent.userId,
     });
     polychat.subRooms.push(claimedSubRoom);
     
@@ -283,6 +317,33 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
 
 const transformer = new GenericTransformer();
 
+const catchSignalInviteLinks = async (roomId: string, event: any): Promise<void> => {
+    // TODO This has not been tested and is an untested copy of catchTelegramInviteLinks
+    if (event.content.msgtype !== 'notice') {
+        return;
+    }
+    const body = event.content.body as unknown;
+    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
+        return;
+    }
+    const subRoomInfo = findAnySubRoom(roomId);
+    if (!subRoomInfo) {
+        return;
+    }
+    const { polychat, subRoom } = subRoomInfo;
+    if (event.sender !== SIGNAL_BRIDGE_MXID) {
+        return;
+    }
+    // TODO Adapt RegExp
+    const match = body.match(/: (?<link>https:\/\/t\.me\/\+[a-zA-Z0-9]+)$/);
+    if (!match) {
+        return;
+    }
+    const inviteLink = match.groups!['link'];
+    subRoom.inviteUrl = inviteLink;
+    subRoom.ready = new Date();
+};
+
 const catchTelegramInviteLinks = async (roomId: string, event: any): Promise<void> => {
     if (event.content.msgtype !== 'notice') {
         return;
@@ -305,6 +366,33 @@ const catchTelegramInviteLinks = async (roomId: string, event: any): Promise<voi
     }
     const inviteLink = match.groups!['link'];
     subRoom.inviteUrl = inviteLink;
+    subRoom.ready = new Date();
+};
+
+const catchWhatsAppInviteLinks = async (roomId: string, event: any): Promise<void> => {
+    // TODO This has not been tested and is an untested copy of catchTelegramInviteLinks
+    if (event.content.msgtype !== 'notice') {
+        return;
+    }
+    const body = event.content.body as unknown;
+    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
+        return;
+    }
+    const subRoomInfo = findAnySubRoom(roomId);
+    if (!subRoomInfo) {
+        return;
+    }
+    const { polychat, subRoom } = subRoomInfo;
+    if (event.sender !== WHATSAPP_BRIDGE_MXID) {
+        return;
+    }
+    const match = body.match(/: (?<link>https:\/\/chat\.whatsapp\.com\/[a-zA-Z0-9]+)$/);
+    if (!match) {
+        return;
+    }
+    const inviteLink = match.groups!['link'];
+    subRoom.inviteUrl = inviteLink;
+    subRoom.ready = new Date();
 };
 
 const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void> => {
@@ -423,6 +511,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
             polychatUserId: intent.userId,
             ready: new Date(),
             roomId,
+            inviteUrl: `irc://${ircChannel}`,
         });
         return;  
     } else if (opts.network === 'signal') {
@@ -471,7 +560,6 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         unclaimedSubRooms.get('signal')!.push({
             network: opts.network,
             polychatUserId: intent.userId,
-            ready: new Date(),
             roomId,
         });
         return;
@@ -529,7 +617,6 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         unclaimedSubRooms.get('telegram')!.push({
             network: opts.network,
             polychatUserId: intent.userId,
-            ready: new Date(),
             roomId,
         });
         return;
@@ -579,7 +666,6 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         unclaimedSubRooms.get('whatsapp')!.push({
             network: opts.network,
             polychatUserId: intent.userId,
-            ready: new Date(),
             roomId,
         });
         return;
@@ -613,7 +699,9 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
 appservice.on('room.message', async (roomId: string, event: any) => {
     if (!event['content']?.['msgtype']) return;
 
+    await catchSignalInviteLinks(roomId, event);
     await catchTelegramInviteLinks(roomId, event);
+    await catchWhatsAppInviteLinks(roomId, event);
 
     const subRoomInfo = findActiveSubRoom(roomId);
     if (subRoomInfo) {
@@ -810,6 +898,7 @@ async function main() {
     appservice.begin().then(async () => {
         console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
         await loadExistingRooms();
+        fillUpSubRoomPool();
         api.set('ready', true);
         api.set('live', true);
     });
