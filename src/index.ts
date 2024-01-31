@@ -271,15 +271,15 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
     if (match) {
         const polychat = findMainRoom(match.groups!['polychatId']!);
         if (!polychat) {
-            await polychatIntent.sendText(subRoom.roomId, `Could not find Polychat. Command: claim <polychat> <network>`);
+            await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, `Could not find Polychat. Command: claim <polychat> <network>`);
             return;
         }
         try {
             const network = match.groups!['network'] as Network; // TODO: unsafe case
             const url = await claimSubRoom(polychat, network);
-            await polychatIntent.sendText(subRoom.roomId, `Invite Url: ${url}`);
+            await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, `Invite Url: ${url}`);
         } catch (error: any) {
-            await polychatIntent.sendText(subRoom.roomId, `error ${error.message}`);
+            await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, `error ${error.message}`);
         }
         return;
     }
@@ -295,13 +295,13 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
             }
             text += `\n* ${member.display_name}`;
         }
-        await polychatIntent.sendText(subRoom.roomId, text);
+        await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, text);
         return;
     }
 
     const user = subRoom.user;
     if (!user) {
-        await polychatIntent.sendText(subRoom.roomId, 'Internal Error: No user identity set. Did you skip a step?');
+        await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, 'Internal Error: No user identity set. Did you skip a step?');
         return;
     }
 
@@ -678,7 +678,7 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
     const polychatIntent = appservice.getIntent(registration.sender_localpart);
     if (typeof event.content.body !== 'string') {
         try {
-            await polychatIntent.sendText(roomId, 'body is not defined');
+            await polychatIntent.underlyingClient.replyText(roomId, event.event_id, 'body is not defined');
         } catch {}
         return;
     }
@@ -687,9 +687,9 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
     if (match) {
         try {
             const polychat = await createPolychat({ name: match.groups!['name']! });
-            await polychatIntent.sendText(roomId, `created ${polychat.mainRoomId}`);
+            await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `created ${polychat.mainRoomId}`);
         } catch (error: any) {
-            await polychatIntent.sendText(roomId, `error ${error.message}`);
+            await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${error.message}`);
         }
         return;
     }
