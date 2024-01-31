@@ -2,11 +2,16 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
-import { claimSubRoom, createPolychat, fillUpSubRoomPool, findMainRoom } from '.';
+import { allPolychats, claimSubRoom, createPolychat, fillUpSubRoomPool, findMainRoom } from '.';
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
 const API_JOIN_BASE_URL = process.env.API_JOIN_BASE_URL || 'https://join.polychat.de';
+
+const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
+const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
+const TELEGRAM_BRIDGE_MXID = process.env.TELEGRAM_BRIDGE_MXID;
+const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
 
 const upload = multer({ dest: PATH_UPLOADS });
 
@@ -27,6 +32,36 @@ const allowCrossDomain = function (req: any, res: any, next: any) {
 // api.use('/api/', express.static(PATH_UPLOADS));
 
 api.use('/api/2024-01', allowCrossDomain);
+api.use('/api/2024-01-debug', allowCrossDomain);
+
+/**
+ * Create a new Polychat.
+ */
+api.get('/api/2024-01-debug/polychats', async (req, res) => {
+    res.json(allPolychats());
+});
+
+/**
+ * Create a new Polychat.
+ */
+api.get('/api/2024-01/settings', async (req, res) => {
+    const networks: string[] = [];
+    if (IRC_BRIDGE_MXID) {
+        networks.push('irc');
+    }
+    if (SIGNAL_BRIDGE_MXID) {
+        networks.push('signal');
+    }
+    if (TELEGRAM_BRIDGE_MXID) {
+        networks.push('telegram');
+    }
+    if (WHATSAPP_BRIDGE_MXID) {
+        networks.push('whatsapp');
+    }
+    res.json({
+        networks,
+    });
+});
 
 /**
  * Create a new Polychat.
@@ -39,9 +74,9 @@ api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
     }
     try {
         const polychat = await createPolychat({
-            name: req.body.name,
+            name: req.body.name.normalize(),
         });
-        fillUpSubRoomPool(polychat);
+        console.log(`API: Created Polychat ${polychat.mainRoomId}`);
         res.json({
             id: polychat.mainRoomId,
             adminUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}?admin=true`,
@@ -61,7 +96,8 @@ api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
  * Get the info of a polychat.
  */
 api.get('/api/2024-01/polychat/:polychat', (req, res) => {
-    const polychat = findMainRoom(req.params.polychat);
+    const polychat = findMainRoom(req.params.polychat.normalize());
+    console.log(`API: Requested Polychat ${req.params.polychat}`);
     if (!polychat) {
         res.status(403).json({
             errcode: 'E_CHANNEL_NOT_FOUND',
@@ -106,6 +142,7 @@ api.get('/api/2024-01/sub-room', async (req, res) => {
         res.json({
             url: inviteUrl,
         });
+        fillUpSubRoomPool();
     } catch (error) {
         res.status(500).json({
             errcode: 'E_UNKNOWN',
@@ -145,6 +182,12 @@ api.post('/api/2024-01/polychat/:polychat/:network', upload.single('avatar'), as
         url: 'https://chat.whatsapp.com/BzkM4rkDt1m2CxlgWpkbfl',
     });
     return;
+});
+
+api.get('/index.js', async (req, res) => {
+    let text = await fsPromises.readFile('./public/index.js', 'utf-8');
+    text = text.replace(/https:\/\/join\.polychat\.de/g, API_JOIN_BASE_URL);
+    res.type('html').end(text);
 });
 
 api.use(express.static('./public'));

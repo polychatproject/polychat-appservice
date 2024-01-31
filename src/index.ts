@@ -184,11 +184,11 @@ function findAnySubRoom(roomId: string): { polychat?: Polychat, subRoom: SubRoom
 }
 
 export function findMainRoom(roomId: string): Polychat | undefined {
-    for (const polychat of polychats) {
-        if (polychat.mainRoomId === roomId) {
-            return polychat;
-        }
-    }
+    return polychats.find(polychat => polychat.mainRoomId === roomId);
+}
+
+export function allPolychats(): Polychat[] {
+    return polychats;
 }
 
 const ensureDisplayNameInRoom = async (roomId: string, localpart: string, displayName: string) => {
