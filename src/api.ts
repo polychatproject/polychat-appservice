@@ -95,27 +95,6 @@ api.get('/api/2024-01/polychat/:polychat', (req, res) => {
 });
 
 /**
- * Claim a sub room
- */
-api.get('/api/2024-01/sub-room', async (req, res) => {
-    
-    if (!mainRoomId) {
-        res.status(403).json({
-            errcode: 'E_MAIN_ROOM_MISSING',
-        });
-        return;
-    }
-    if (!network) {
-        res.status(403).json({
-            errcode: 'E_NETWORK_MISSING',
-        });
-        return;
-    }
-
-    
-});
-
-/**
  * Get an invite link for a bridged polychat.
  */
 api.post('/api/2024-01/polychat/:polychatId/:networkId', upload.single('avatar'), async (req, res) => {
@@ -154,7 +133,7 @@ api.post('/api/2024-01/polychat/:polychatId/:networkId', upload.single('avatar')
     }
 
     try {
-        const inviteUrl = await claimSubRoom(polychat, networkId);
+        const inviteUrl = await claimSubRoom(polychat, networkId, identity === 'custom' ? name : undefined);
         res.json({
             url: inviteUrl,
         });
