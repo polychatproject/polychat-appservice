@@ -897,7 +897,8 @@ async function main() {
     AutojoinRoomsMixin.setupOnAppservice(appservice);
     appservice.begin().then(async () => {
         console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
-        await loadExistingRooms();
+        // FIXME: loadExistingRooms crashes for Yan in the Alpha environment
+        //await loadExistingRooms();
         fillUpSubRoomPool();
         api.set('ready', true);
         api.set('live', true);
