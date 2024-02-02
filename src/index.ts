@@ -338,12 +338,12 @@ const catchSignalInviteLinks = async (roomId: string, event: any): Promise<void>
     const { polychat, subRoom } = subRoomInfo;
     // Examples:
     // https://signal.group/#CjQKIBLIifvyWswZrG2GalWLYuY_slMXoJkcdcRHWX8tve-iEhAkZV_oH60OaQhcU1TD3mlq
-    const match = body.match(/: (?<link>https:\/\/signal\.group\/#[a-zA-Z0-9_-]+)$/);
+    const match = body.match(/https:\/\/signal\.group\/#[a-zA-Z0-9_-]+)/);
     if (!match) {
         console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
     }
-    const inviteLink = match.groups!['link'];
+    const inviteLink = match[0];
     subRoom.inviteUrl = inviteLink;
     subRoom.ready = new Date();
 };
@@ -404,7 +404,7 @@ const catchWhatsAppInviteLinks = async (roomId: string, event: any): Promise<voi
         console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
     }
-    const inviteLink = match.groups!['link'];
+    const inviteLink = match[0];
     subRoom.inviteUrl = inviteLink;
     subRoom.ready = new Date();
 };
