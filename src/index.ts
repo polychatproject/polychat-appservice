@@ -327,13 +327,23 @@ const catchInviteLinks = async (roomId: string, event: any): Promise<void> => {
     }
     const subRoomInfo = findAnySubRoom(roomId);
     if (!subRoomInfo) {
+        console.warn(`catchInviteLinks: Found an invite link in ${roomId}, but it's not a sub room.`);
         return;
     }
     const { subRoom } = subRoomInfo;
-    // if (subRoom.network !== 'whatsapp') {
-    //     console.warn(`Found an invite link for whatsapp, but the sub room is for ${subRoom.network}.`);
-    //     return;
-    // }
+    if (signalInviteLink && subRoom.network !== 'signal') {
+        console.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for signal, but the sub room is for ${subRoom.network}.`);
+        return;
+    }
+    if (telegramInviteLink && subRoom.network !== 'telegram') {
+        console.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for telegram, but the sub room is for ${subRoom.network}.`);
+        return;
+    }
+    if (whatsAppInviteLink && subRoom.network !== 'whatsapp') {
+        console.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for whatsapp, but the sub room is for ${subRoom.network}.`);
+        return;
+    }
+    console.log(`catchInviteLinks: Caught invite link in sub room ${roomId}`);
     subRoom.inviteUrl = signalInviteLink ?? telegramInviteLink ?? whatsAppInviteLink;
     subRoom.ready = new Date();
 };
