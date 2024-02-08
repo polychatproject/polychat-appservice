@@ -11,8 +11,11 @@ import {
 import { parse as parseYAML } from 'yaml';
 import { uniqueId } from './helper';
 import api from './api';
+import { logger } from './logger';
 import { GenericTransformer } from './transformers/generic';
 import { extractSignalInviteLink, extractTelegramInviteLink, extractWhatsAppInviteLink } from './invite-links';
+
+const log = logger.child({ name: 'appservice' });
 
 const DEBUG_MXID = process.env.DEBUG_MXID;
 const API_BIND_ADDRESS = process.env.API_BIND_ADDRESS || '0.0.0.0';
@@ -59,10 +62,10 @@ type PolychatStateEventRoom = {
     network: string,
 };
 
-console.debug('IRC_BRIDGE_MXID', IRC_BRIDGE_MXID);
-console.debug('SIGNAL_BRIDGE_MXID', SIGNAL_BRIDGE_MXID);
-console.debug('TELEGRAM_BRIDGE_MXID', TELEGRAM_BRIDGE_MXID);
-console.debug('WHATSAPP_BRIDGE_MXID', WHATSAPP_BRIDGE_MXID);
+log.debug('IRC_BRIDGE_MXID', IRC_BRIDGE_MXID);
+log.debug('SIGNAL_BRIDGE_MXID', SIGNAL_BRIDGE_MXID);
+log.debug('TELEGRAM_BRIDGE_MXID', TELEGRAM_BRIDGE_MXID);
+log.debug('WHATSAPP_BRIDGE_MXID', WHATSAPP_BRIDGE_MXID);
 
 const registration: IAppserviceRegistration = parseYAML(fs.readFileSync(path.join(PATH_CONFIG, 'registration.yaml'), 'utf8'));
 
@@ -250,7 +253,10 @@ const ensureDisplayNameInRoom = async (roomId: string, localpart: string, displa
 };
 
 const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, user: SubRoomUser): Promise<string> => {
-    console.debug('Called getDisplayNameForPolychat', polychat.mainRoomId, user.localpart);
+    log.debug({
+        polychat: polychat.mainRoomId,
+        user_localpart: user.localpart,
+    }, 'Called getDisplayNameForPolychat');
     if (user.identity === 'custom') {
         return user.displayName;
     }
@@ -259,18 +265,17 @@ const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, u
         // TODO: The event is sometimes not found
         const state = (await intent.underlyingClient.getRoomStateEvent(subRoom.roomId, 'm.room.member', intent.userId));
         return state.displayname;
-    } catch (error) {
-        console.error(`Error fetching the displayname of ${intent.userId} in the sub room ${subRoom.roomId}.`);
-        console.error(error);
+    } catch (err) {
+        log.error({ err },`Error fetching the displayname of ${intent.userId} in the sub room ${subRoom.roomId}.`);
         return 'Polychat user';
     }
 };
 
 const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Polychat, event: any): Promise<void> => {
-    console.debug('Called onMessageInClaimedSubRoom', {
+    log.debug({
         polychat: polychat.mainRoomId,
         event: event.event_id,
-    });
+    }, 'Called onMessageInClaimedSubRoom');
     const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
     if (event.sender === polychatIntent.userId) {
         // Ignore echo
@@ -320,7 +325,7 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
 
     const intent = appservice.getIntent(user.localpart);
     await ensureDisplayNameInRoom(polychat.mainRoomId, user.localpart, await getDisplayNameForPolychat(polychat, subRoom, user));
-    console.log('onMessageInSubRoom content', JSON.stringify(event.content));
+    log.debug({event_content: event.content}, 'onMessageInSubRoom content');
 
     const cleanedContent = { ...event.content };
     delete cleanedContent['fi.mau.telegram.source'];
@@ -339,23 +344,23 @@ const catchInviteLinks = async (roomId: string, event: any): Promise<void> => {
     }
     const subRoomInfo = findAnySubRoom(roomId);
     if (!subRoomInfo) {
-        console.warn(`catchInviteLinks: Found an invite link in ${roomId}, but it's not a sub room.`);
+        log.warn(`catchInviteLinks: Found an invite link in ${roomId}, but it's not a sub room.`);
         return;
     }
     const { subRoom } = subRoomInfo;
     if (signalInviteLink && subRoom.network !== 'signal') {
-        console.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for signal, but the sub room is for ${subRoom.network}.`);
+        log.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for signal, but the sub room is for ${subRoom.network}.`);
         return;
     }
     if (telegramInviteLink && subRoom.network !== 'telegram') {
-        console.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for telegram, but the sub room is for ${subRoom.network}.`);
+        log.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for telegram, but the sub room is for ${subRoom.network}.`);
         return;
     }
     if (whatsAppInviteLink && subRoom.network !== 'whatsapp') {
-        console.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for whatsapp, but the sub room is for ${subRoom.network}.`);
+        log.warn(`catchInviteLinks: Found an invite link in sub room ${roomId} for whatsapp, but the sub room is for ${subRoom.network}.`);
         return;
     }
-    console.log(`catchInviteLinks: Caught invite link in sub room ${roomId}`);
+    log.info(`catchInviteLinks: Caught invite link in sub room ${roomId}`);
     subRoom.inviteUrl = signalInviteLink ?? telegramInviteLink ?? whatsAppInviteLink;
     subRoom.timestampReady = new Date();
     subRoom.lastDebugState = 'Caught invite url; room is now ready to be claimed';
@@ -371,14 +376,14 @@ const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void
             continue;
         }
         const { content } = await transformer.transformEventForNetwork(polychat, userProfile, event);
-        console.log('onMessageInMainRoom content', JSON.stringify(content));
+        log.debug({ event_content: content}, 'onMessageInMainRoom content');
         const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
         polychatIntent.sendEvent(subRoom.roomId, content);
     }
 };
 
 export const fillUpSubRoomPool = () => {
-    console.log(`Called fillUpSubRoomPool`)
+    log.debug(`Called fillUpSubRoomPool`)
     const networks: Map<Network, string | undefined> = new Map([
         ['irc', IRC_BRIDGE_MXID],
         ['telegram', TELEGRAM_BRIDGE_MXID],
@@ -389,16 +394,16 @@ export const fillUpSubRoomPool = () => {
     for (const [network, mxid] of networks.entries()) {
         if (!mxid) {
             // Network not configured
-            console.debug(`fillUpSubRoomPool: MXID for ${network} not defined`);
+            log.debug(`fillUpSubRoomPool: MXID for ${network} not defined`);
             continue;
         }
         const unclaimedSubRoomsForThisNetwork = unclaimedSubRooms.get(network);
         if (unclaimedSubRoomsForThisNetwork === undefined) {
-            console.warn(`INTERNAL ERROR: No array of unclaimed sub room for network ${network}`)
+            log.warn(`INTERNAL ERROR: No array of unclaimed sub room for network ${network}`)
             continue;
         }
         const missing = Math.max(SUB_ROOMS_POOL_TARGET - unclaimedSubRoomsForThisNetwork.length, 0);
-        console.info(`Sub Room Pool: Creating ${missing} sub rooms for ${network}`);
+        log.info(`Sub Room Pool: Creating ${missing} sub rooms for ${network}`);
         for (let i = 0; i < missing; i++) {
             createSubRoom({ network });
         }
@@ -436,9 +441,9 @@ export const createPolychat = async (opts: {name: string}): Promise<Polychat> =>
 };
 
 const createSubRoom = async (opts: {name?: string, network: Network}) => {
-    console.debug('Called createSubRoom', {
+    log.debug({
         network: opts.network,
-    });
+    }, 'Called createSubRoom');
     if (opts.network === 'irc') {
         if (!IRC_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
@@ -503,17 +508,17 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
             ],
         });
         if (DEBUG_MXID) {
-            console.log(`createSubRoom (signal): Invite DEBUG_MXID to ${roomId}`);
+            log.info(`createSubRoom (signal): Invite DEBUG_MXID to ${roomId}`);
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
-        console.log(`createSubRoom (signal): Invite SIGNAL_BRIDGE_MXID to ${roomId}`);
+        log.info(`createSubRoom (signal): Invite SIGNAL_BRIDGE_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(SIGNAL_BRIDGE_MXID, roomId);
         
         // The Signal bot wants to be able to redact events
-        console.log(`createSubRoom (signal): Set power level of SIGNAL_BRIDGE_MXID to 50 in ${roomId}`);
+        log.info(`createSubRoom (signal): Set power level of SIGNAL_BRIDGE_MXID to 50 in ${roomId}`);
         await intent.underlyingClient.setUserPowerLevel(SIGNAL_BRIDGE_MXID, roomId, 50);
-        console.log(`createSubRoom (signal): Join as SIGNAL_BRIDGE_TUG_MXID to ${roomId}`);
+        log.info(`createSubRoom (signal): Join as SIGNAL_BRIDGE_TUG_MXID to ${roomId}`);
 
         const room: UnclaimedSubRoom = {
             network: opts.network,
@@ -526,27 +531,25 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
 
         // TODO: Wait for join, then set up link
         setTimeout(async () => {
-            console.log(`createSubRoom (signal): Send "create group" command to ${roomId}`);
+            log.info(`createSubRoom (signal): Send "create group" command to ${roomId}`);
             try {
                 await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} create`);
                 room.lastDebugState = 'Sent "create group" command';
-                console.log(`createSubRoom (signal): Sent "create group" to ${roomId}`);
+                log.info(`createSubRoom (signal): Sent "create group" to ${roomId}`);
                 // TODO: Wait for success, then get invite link
                 setTimeout(async () => {
-                    console.log(`createSubRoom (signal): Send "invite-link" to ${roomId}`);
+                    log.info(`createSubRoom (signal): Send "invite-link" to ${roomId}`);
                     try {
                         await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} invite-link`);
                         room.lastDebugState = 'Sent "invite-link" command';
-                        console.log(`createSubRoom (signal): Sent "invite-link" to ${roomId}`);
-                    } catch (error) {
-                        console.warn(`createSubRoom (signal): Failed to send "invite-link" request to ${roomId}`);
-                        console.warn(error);
+                        log.info(`createSubRoom (signal): Sent "invite-link" to ${roomId}`);
+                    } catch (err) {
+                        log.warn({ err }, `createSubRoom (signal): Failed to send "invite-link" request to ${roomId}`);
                         room.lastDebugState = 'Failed to send "invite-link" command';
                     }
                 }, 15000);
-            } catch (error) {
-                console.warn(`createSubRoom (signal): Failed to send "create group" request to ${roomId}`);
-                console.warn(error);
+            } catch (err) {
+                log.warn({ err }, `createSubRoom (signal): Failed to send "create group" request to ${roomId}`);
                 room.lastDebugState = 'Failed to send "create group" command';
             }
         }, 15000);
@@ -575,20 +578,20 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
             ],
         });
         if (DEBUG_MXID) {
-            console.log(`createSubRoom (telegram): Invite DEBUG_MXID to ${roomId}`);
+            log.info(`createSubRoom (telegram): Invite DEBUG_MXID to ${roomId}`);
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
-        console.log(`createSubRoom (telegram): Invite TELEGRAM_BRIDGE_MXID to ${roomId}`);
+        log.info(`createSubRoom (telegram): Invite TELEGRAM_BRIDGE_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_MXID, roomId);
         
         // The Telegram bot wants to be able to redact events
-        console.log(`createSubRoom (telegram): Set power level of TELEGRAM_BRIDGE_MXID to 50 in ${roomId}`);
+        log.info(`createSubRoom (telegram): Set power level of TELEGRAM_BRIDGE_MXID to 50 in ${roomId}`);
         await intent.underlyingClient.setUserPowerLevel(TELEGRAM_BRIDGE_MXID, roomId, 50);
-        console.log(`createSubRoom (telegram): Invite TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
+        log.info(`createSubRoom (telegram): Invite TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_TUG_MXID, roomId);
         const tugIntent = appservice.getIntentForUserId(TELEGRAM_BRIDGE_TUG_MXID);
-        console.log(`createSubRoom (telegram): Join as TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
+        log.info(`createSubRoom (telegram): Join as TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
         await tugIntent.joinRoom(roomId);
 
         const room: UnclaimedSubRoom = {
@@ -602,32 +605,29 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
 
         // TODO: Wait for join, then set up link
         setTimeout(async () => {
-            console.log(`createSubRoom (telegram): Send "create group" command to ${roomId}`);
+            log.info(`createSubRoom (telegram): Send "create group" command to ${roomId}`);
             try {
                 await intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} create group`);
                 room.lastDebugState = 'Sent "create group" command';
-                console.log(`createSubRoom (telegram): Sent "create group" to ${roomId}`);
+                log.info(`createSubRoom (telegram): Sent "create group" to ${roomId}`);
                 // TODO: Wait for success, then get invite link
                 setTimeout(async () => {
-                    console.log(`createSubRoom (telegram): Send "invite-link" to ${roomId}`);
+                    log.info(`createSubRoom (telegram): Send "invite-link" to ${roomId}`);
                     try {
                         await intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} invite-link`);
-                    } catch (error) {
-                        console.warn(`createSubRoom (telegram): Failed to send "invite-link" request to ${roomId}`);
-                        console.warn(error);
+                    } catch (err) {
+                        log.warn({ err }, `createSubRoom (telegram): Failed to send "invite-link" request to ${roomId}`);
                         room.lastDebugState = 'Failed to send "invite-link" command';
                     }
                     try {
                         await tugIntent.leaveRoom(roomId);
-                        console.log(`createSubRoom (telegram): Left ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
-                    } catch (error) {
-                        console.warn(`createSubRoom (telegram): Failed to leave ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
-                        console.warn(error);
+                        log.info(`createSubRoom (telegram): Left ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
+                    } catch (err) {
+                        log.warn({ err }, `createSubRoom (telegram): Failed to leave ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
                     }
                 }, 15000);
-            } catch (error) {
-                console.warn(`createSubRoom (telegram): Failed to send "create group" request to ${roomId}`);
-                console.warn(error);
+            } catch (err) {
+                log.warn({ err }, `createSubRoom (telegram): Failed to send "create group" request to ${roomId}`);
                 room.lastDebugState = 'Failed to send "create group" command';
             }
         }, 15000);
@@ -654,24 +654,24 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
             ],
         });
         if (DEBUG_MXID) {
-            console.log(`createSubRoom (whatsapp): Invite DEBUG_MXID to ${roomId}`);
+            log.info(`createSubRoom (whatsapp): Invite DEBUG_MXID to ${roomId}`);
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
-        console.log(`createSubRoom (whatsapp): Invite WHATSAPP_BRIDGE_MXID to ${roomId}`);
+        log.info(`createSubRoom (whatsapp): Invite WHATSAPP_BRIDGE_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(WHATSAPP_BRIDGE_MXID, roomId);
         
         // The WhatsApp bot wants to be able to redact events
-        console.log(`createSubRoom (whatsapp): Set power level of WHATSAPP_BRIDGE_MXID to 50 in ${roomId}`);
+        log.info(`createSubRoom (whatsapp): Set power level of WHATSAPP_BRIDGE_MXID to 50 in ${roomId}`);
         await intent.underlyingClient.setUserPowerLevel(WHATSAPP_BRIDGE_MXID, roomId, 50);
-        console.log(`createSubRoom (whatsapp): Join as WHATSAPP_BRIDGE_TUG_MXID to ${roomId}`);
+        log.info(`createSubRoom (whatsapp): Join as WHATSAPP_BRIDGE_TUG_MXID to ${roomId}`);
         // TODO: Wait for success, then set up link
         setTimeout(() => {
-            console.log(`createSubRoom (whatsapp): Send "create group" command to ${roomId}`);
+            log.info(`createSubRoom (whatsapp): Send "create group" command to ${roomId}`);
             intent.underlyingClient.sendText(roomId, `${WHATSAPP_BRIDGE_COMMAND_PREFIX} create`);
             // TODO: Wait for link, then get invite link
             setTimeout(() => {
-                console.log(`createSubRoom (whatsapp): Send "invite-link" to ${roomId}`);
+                log.info(`createSubRoom (whatsapp): Send "invite-link" to ${roomId}`);
                 intent.underlyingClient.sendText(roomId, `${WHATSAPP_BRIDGE_COMMAND_PREFIX} invite-link`);
             }, 15000);
         }, 15000);
@@ -728,11 +728,11 @@ appservice.on('room.message', async (roomId: string, event: any) => {
 
     return onMessageInControlRoom(roomId, event);
 
-    console.info(`Didn't know what to do with event in ${roomId}`);
+    log.info(`Didn't know what to do with event in ${roomId}`);
 });
 
 appservice.on('room.event', async (roomId: string, event: any) => {
-    console.debug('room.event', JSON.stringify(event));
+    log.debug('room.event', JSON.stringify(event));
     const polychatIntent = appservice.getIntent(registration.sender_localpart);
     if (event.sender === polychatIntent.userId) {
         // Ignore echo
@@ -764,7 +764,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
             if (!msg) {
                 return;
             }
-            console.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
+            log.info(`Main room: membership of ${event['state_key']} changed to ${event.content.membership}`);
             // TODO: Find display name of user
             for (const subRoom of polychat.subRooms) {
                 const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
@@ -777,7 +777,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
     if (event['type'] === 'm.room.name' && event['state_key'] === '') {
         const polychat = findMainRoom(roomId);
         if (polychat) {
-            console.info(`Main room: name changed ${JSON.stringify(event.content)}`);
+            log.info(`Main room: name changed ${JSON.stringify(event.content)}`);
             for (const subRoom of polychat.subRooms) {
                 const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', event.content);
@@ -789,7 +789,7 @@ appservice.on('room.event', async (roomId: string, event: any) => {
     if (event['type'] === 'm.room.avatar' && event['state_key'] === '') {
         const polychat = findMainRoom(roomId);
         if (polychat) {
-            console.info(`Main room: avatar changed ${JSON.stringify(event.content)}`);
+            log.info(`Main room: avatar changed ${JSON.stringify(event.content)}`);
             for (const subRoom of polychat.subRooms) {
                 const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
                 await intent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.avatar', '', event.content);
@@ -838,8 +838,8 @@ async function safelyGetRoomStateEvent(client: MatrixClient, roomId: string, typ
 }
 
 async function loadExistingRooms() {
-    console.info('Called loadExistingRooms');
-    console.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
+    log.info('Called loadExistingRooms');
+    log.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
     const intents = [
         appservice.getIntent(registration.sender_localpart),
         ...SIGNAL_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
@@ -851,14 +851,14 @@ async function loadExistingRooms() {
     const allControlRooms: ControlRoom[] = [];
     for (const intent of intents) {
         const joinedRooms = await intent.getJoinedRooms();
-        console.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
+        log.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
         for (const roomId of joinedRooms) {
             try {
                 const roomState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, PolychatStateEventType.room, '');
                 const nameState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, 'm.room.name', '');
                 const tombstoneState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, 'm.room.tombstone', '');
                 if (tombstoneState?.replacement_room) {
-                    console.log(`Ignore existing room ${roomId} because it has a tombstone and got replaced by ${tombstoneState.replacement_room}`);
+                    log.info(`Ignore existing room ${roomId} because it has a tombstone and got replaced by ${tombstoneState.replacement_room}`);
                     continue;
                 }
                 if (roomState?.content?.type === 'main') {
@@ -868,7 +868,7 @@ async function loadExistingRooms() {
                         name: nameState?.name, // TODO Could be undefined
                         subRooms: [],
                     };
-                    console.debug('Found an existing Polychat / Main Room', polychat);
+                    log.debug('Found an existing Polychat / Main Room', polychat);
                     allPolychats.push(polychat);
                 } else if (roomState?.content?.type === 'sub') {
                     // TODO: Add `timestampCreated`
@@ -880,7 +880,7 @@ async function loadExistingRooms() {
                         timestampCreated: new Date(),
                         lastDebugState: 'Loaded existing room after polychat-appservice restart',
                     };
-                    console.debug('Found an existing Sub Room', subRoom);
+                    log.debug('Found an existing Sub Room', subRoom);
                     allSubRooms.push(subRoom);
                 } else if (roomState?.content?.type === 'control') {
                     // TODO: Add `ready`
@@ -888,12 +888,11 @@ async function loadExistingRooms() {
                         network: roomState.network,
                         roomId,
                     };
-                    console.debug('Found an existing Control Room', controlRoom);
+                    log.debug('Found an existing Control Room', controlRoom);
                     allControlRooms.push(controlRoom);
                 }
-            } catch (error) {
-                console.warn('Failed to load potential Polychat room.');
-                console.warn(error);
+            } catch (err) {
+                log.warn({ err }, 'Failed to load potential Polychat room.');
             }
         }
     }
@@ -901,7 +900,7 @@ async function loadExistingRooms() {
 
     polychats.push(...allPolychats);
 
-    console.info(`Done loadExistingRooms: Found ${allPolychats.length} main rooms, ${allSubRooms.length} sub rooms and ${allControlRooms.length} control rooms`);
+    log.info(`Done loadExistingRooms: Found ${allPolychats.length} main rooms, ${allSubRooms.length} sub rooms and ${allControlRooms.length} control rooms`);
 }
 
 async function main() {
@@ -912,7 +911,7 @@ async function main() {
     // Typically appservices will want to autojoin all rooms
     AutojoinRoomsMixin.setupOnAppservice(appservice);
     appservice.begin().then(async () => {
-        console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
+        log.info(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
         if (LOAD_EXISTING_ROOMS) {
             await loadExistingRooms();
         }
@@ -923,21 +922,20 @@ async function main() {
     
     // API
     const apiServer = api.listen(API_PORT, API_BIND_ADDRESS, () => {
-        console.info(`API: Listening on ${API_BIND_ADDRESS}:${API_PORT}`);
+        log.info(`API: Listening on ${API_BIND_ADDRESS}:${API_PORT}`);
     });
 
     process.once('SIGTERM', () => {
-        console.error('Got SIGTERM');
+        log.info('Got SIGTERM');
         try {
             appservice.stop();
-            console.log('AppService: HTTP server closed');
+            log.info('AppService: HTTP server closed');
             apiServer.close(() => {
-                console.log('API: HTTP server closed');
+                log.info('API: HTTP server closed');
                 process.exit(0);
             });
-        } catch (error) {
-            console.error("Failed to shut down");
-            console.error(error);
+        } catch (err) {
+            log.error({ err }, 'Failed to shut down');
             process.exit(1);
         }
     });

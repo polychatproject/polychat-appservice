@@ -2,15 +2,17 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
+import { logger } from './logger';
 import {
     allPolychats,
     claimSubRoom,
     createPolychat,
-    fillUpSubRoomPool,
     findMainRoom,
     getEnabledNetworks,
     unclaimedSubRooms,
 } from '.';
+
+const log = logger.child({ name: 'api' });
 
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
@@ -58,16 +60,15 @@ api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
         const polychat = await createPolychat({
             name: req.body.name.normalize(),
         });
-        console.log(`API: Created Polychat ${polychat.mainRoomId}`);
+        log.info(`API: Created Polychat ${polychat.mainRoomId}`);
         res.json({
             id: polychat.mainRoomId,
             adminUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}?admin=true`,
             joinUrl: `${API_JOIN_BASE_URL}/${polychat.mainRoomId}`,
             name: polychat.name,
         });
-    } catch (error) {
-        console.warn('Failed to create Polychat');
-        console.warn(error);
+    } catch (err) {
+        log.warn({ err }, 'Failed to create Polychat');
         res.status(500).json({
             errcode: 'E_INTERNAL_ERROR',
         });
@@ -79,7 +80,7 @@ api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
  */
 api.get('/api/2024-01/polychat/:polychat', (req, res) => {
     const polychat = findMainRoom(req.params.polychat.normalize());
-    console.log(`API: Requested Polychat ${req.params.polychat}`);
+    log.info(`API: Requested Polychat ${req.params.polychat}`);
     if (!polychat) {
         res.status(403).json({
             errcode: 'E_CHANNEL_NOT_FOUND',
@@ -137,9 +138,8 @@ api.post('/api/2024-01/polychat/:polychatId/:networkId', upload.single('avatar')
         res.json({
             url: inviteUrl,
         });
-    } catch (error) {
-        console.warn(`API: Error claiming a sub room for ${polychat.mainRoomId} for ${networkId}`);
-        console.warn(error);
+    } catch (err) {
+        log.warn({ err }, `API: Error claiming a sub room for ${polychat.mainRoomId} for ${networkId}`);
         res.status(500).json({
             errcode: 'E_UNKNOWN',
         });

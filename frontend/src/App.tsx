@@ -65,7 +65,6 @@ export function App(props: { }) {
             <AppBar
                 elevation={0}
                 position="static"
-                color='secondary'
             >
                 <Container maxWidth="sm">
                     <Toolbar disableGutters>
@@ -101,9 +100,7 @@ export function App(props: { }) {
             </AppBar>
             <Container maxWidth="sm">
                 {page === '' && (
-                    <ThemeProvider theme={theme}>
-                        <Splash />
-                    </ThemeProvider>
+                    <Splash />
                 )}
                 {page === 'create' && (
                     <CreatePolychat />

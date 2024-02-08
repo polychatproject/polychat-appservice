@@ -27,7 +27,6 @@ export function Splash(props: { }) {
             <Button
                 href="#create"
                 variant="outlined"
-                color="secondary"
             >Create a Polychat</Button>
 
             <div style={{ height: '24px' }} />
