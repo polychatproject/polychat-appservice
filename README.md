@@ -19,6 +19,7 @@ bun run start
 * `HOMESERVER_URL` - The best URL to reach the homeserver, e.g. https://matrix-client.matrix.org.
 * `PATH_DATA` - Folder path to persist data. Makes starting up faster and prevents events from being processed twice.
 * `PATH_CONFIG` - Folder path for config files. Needs `registration.yaml`.
+* `LOAD_EXISTING_ROOMS` - Experimental!! Set to "true" to load existing rooms. Defaults to false.
 * `SUB_ROOMS_POOL_TARGET` - The number of sub rooms we want to have per network. Defaults to 2.
 
 * `IRC_BRIDGE_MXID` - The Matrix User ID of the IRC bridge.

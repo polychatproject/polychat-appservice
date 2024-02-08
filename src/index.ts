@@ -23,6 +23,7 @@ const HOMESERVER_NAME = process.env.HOMESERVER_NAME || 'localhost';
 const HOMESERVER_URL = process.env.HOMESERVER_URL || 'http://localhost:8008';
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_CONFIG = process.env.PATH_CONFIG || './config';
+const LOAD_EXISTING_ROOMS = process.env.LOAD_EXISTING_ROOMS === 'true';
 const SUB_ROOMS_POOL_TARGET = typeof process.env.SUB_ROOMS_POOL_TARGET === 'string' ? Number.parseInt(process.env.SUB_ROOMS_POOL_TARGET) : 2;
 
 const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
@@ -850,8 +851,9 @@ async function main() {
     AutojoinRoomsMixin.setupOnAppservice(appservice);
     appservice.begin().then(async () => {
         console.log(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
-        // FIXME: loadExistingRooms crashes for Yan in the Alpha environment
-        //await loadExistingRooms();
+        if (LOAD_EXISTING_ROOMS) {
+            await loadExistingRooms();
+        }
         fillUpSubRoomPool();
         api.set('ready', true);
         api.set('live', true);
