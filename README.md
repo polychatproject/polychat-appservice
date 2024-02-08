@@ -19,9 +19,9 @@ bun run start
 * `HOMESERVER_URL` - The best URL to reach the homeserver, e.g. https://matrix-client.matrix.org.
 * `PATH_DATA` - Folder path to persist data. Makes starting up faster and prevents events from being processed twice.
 * `PATH_CONFIG` - Folder path for config files. Needs `registration.yaml`.
-* `LOAD_EXISTING_ROOMS` - Experimental!! Set to "true" to load existing rooms. Defaults to false.
 * `SUB_ROOMS_POOL_TARGET` - The number of sub rooms we want to have per network. Defaults to 2.
 
+### Networks
 * `IRC_BRIDGE_MXID` - The Matrix User ID of the IRC bridge.
 * `IRC_BRIDGE_SERVER` - The IRC server name on the IRC bridge, e.g. "inspircd".
 * `SIGNAL_BRIDGE_MXID` - The Matrix User ID of the Signal bridge.
@@ -34,6 +34,9 @@ bun run start
 * `WHATSAPP_BRIDGE_MXID` - The Matrix User ID of the WhatsApp bridge.
 * `WHATSAPP_BRIDGE_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs which have a linked WhatsApp account. They will be the "Polychat" account talking to WhatsApp users.
 * `WHATSAPP_BRIDGE_COMMAND_PREFIX` - How to address the WhatsApp bridge bot? Defaults to "!wa".
+
+### Experimental features
+* `LOAD_EXISTING_ROOMS` - Experimental!! Set to "true" to load existing rooms. Defaults to false.
 
 ## Documentation
 
