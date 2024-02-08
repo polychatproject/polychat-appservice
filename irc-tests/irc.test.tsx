@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createReadStream, createWriteStream, ReadStream, WriteStream } from 'node:fs';
+import { createWriteStream, WriteStream } from 'node:fs';
 import * as fsPromise from 'node:fs/promises';
 import * as path from 'node:path';
 

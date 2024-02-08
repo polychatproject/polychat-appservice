@@ -5,7 +5,8 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "start": "bun run src/index.ts",
-    "test:irc": "bun test irc-tests/**"
+    "test:irc": "bun test irc-tests/**",
+    "test:unit": "bun test src/**"
   },
   "devDependencies": {
     "bun-types": "latest"

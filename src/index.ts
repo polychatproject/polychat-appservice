@@ -12,6 +12,7 @@ import { parse as parseYAML } from 'yaml';
 import { uniqueId } from './helper';
 import api from './api';
 import { GenericTransformer } from './transformers/generic';
+import { extractSignalInviteLink, extractTelegramInviteLink, extractWhatsAppInviteLink } from './invite-links';
 
 const DEBUG_MXID = process.env.DEBUG_MXID;
 const API_BIND_ADDRESS = process.env.API_BIND_ADDRESS || '0.0.0.0';
@@ -317,96 +318,23 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
 
 const transformer = new GenericTransformer();
 
-const catchSignalInviteLinks = async (roomId: string, event: any): Promise<void> => {
-    // TODO This has not been tested and is an untested copy of catchTelegramInviteLinks
-    if (event.content.msgtype !== 'notice') {
-        return;
-    }
-    const body = event.content.body as unknown;
-    // TODO Verify that the bridge uses this text to start an invitation link response.
-    // This was taken from the Telegram bridge.
-    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
-        return;
-    }
-    if (event.sender !== SIGNAL_BRIDGE_MXID) {
+const catchInviteLinks = async (roomId: string, event: any): Promise<void> => {
+    const signalInviteLink = SIGNAL_BRIDGE_MXID ? extractSignalInviteLink(event, SIGNAL_BRIDGE_MXID) : undefined;
+    const telegramInviteLink = TELEGRAM_BRIDGE_MXID ? extractTelegramInviteLink(event, TELEGRAM_BRIDGE_MXID) : undefined;
+    const whatsAppInviteLink = WHATSAPP_BRIDGE_MXID ? extractWhatsAppInviteLink(event, WHATSAPP_BRIDGE_MXID) : undefined;
+    if (!signalInviteLink &&  !telegramInviteLink && !whatsAppInviteLink) {
         return;
     }
     const subRoomInfo = findAnySubRoom(roomId);
     if (!subRoomInfo) {
         return;
     }
-    const { polychat, subRoom } = subRoomInfo;
-    // Examples:
-    // https://signal.group/#CjQKIBLIifvyWswZrG2GalWLYuY_slMXoJkcdcRHWX8tve-iEhAkZV_oH60OaQhcU1TD3mlq
-    // testo
-    const match = body.match(/https:\/\/signal\.group\/#[a-zA-Z0-9_-]+/);
-    if (!match) {
-        console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
-        return;
-    }
-    const inviteLink = match[0];
-    subRoom.inviteUrl = inviteLink;
-    subRoom.ready = new Date();
-};
-
-const catchTelegramInviteLinks = async (roomId: string, event: any): Promise<void> => {
-    if (event.content.msgtype !== 'notice') {
-        return;
-    }
-    const body = event.content.body as unknown;
-    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
-        return;
-    }
-    if (event.sender !== TELEGRAM_BRIDGE_MXID) {
-        return;
-    }
-    const subRoomInfo = findAnySubRoom(roomId);
-    if (!subRoomInfo) {
-        return;
-    }
-    const { polychat, subRoom } = subRoomInfo;
-    // Examples:
-    // https://t.me/+U6Yt2XIwPJxiODNi
-    // https://t.me/+w_K5Tl6SPD1kN2Vi
-    const match = body.match(/https:\/\/t\.me\/\+[a-zA-Z0-9_]+/);
-    if (!match) {
-        console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
-        return;
-    }
-    const inviteLink = match[0];
-    subRoom.inviteUrl = inviteLink;
-    subRoom.ready = new Date();
-};
-
-const catchWhatsAppInviteLinks = async (roomId: string, event: any): Promise<void> => {
-    // TODO This has not been tested and is an untested copy of catchTelegramInviteLinks
-    if (event.content.msgtype !== 'notice') {
-        return;
-    }
-    const body = event.content.body as unknown;
-    // TODO Verify that the bridge uses this text to start an invitation link response.
-    // This was taken from the Telegram bridge.
-    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
-        return;
-    }
-    if (event.sender !== WHATSAPP_BRIDGE_MXID) {
-        return;
-    }
-    const subRoomInfo = findAnySubRoom(roomId);
-    if (!subRoomInfo) {
-        return;
-    }
-    const { polychat, subRoom } = subRoomInfo;
-    // Examples:
-    // https://chat.whatsapp.com/BzkM4rkDt1m2CxlgWpkbfl
-    // https://chat.whatsapp.com/FJCRPV9PUEDBpFR5L5wIuz
-    const match = body.match(/https:\/\/chat\.whatsapp\.com\/[a-zA-Z0-9]+/);
-    if (!match) {
-        console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
-        return;
-    }
-    const inviteLink = match[0];
-    subRoom.inviteUrl = inviteLink;
+    const { subRoom } = subRoomInfo;
+    // if (subRoom.network !== 'whatsapp') {
+    //     console.warn(`Found an invite link for whatsapp, but the sub room is for ${subRoom.network}.`);
+    //     return;
+    // }
+    subRoom.inviteUrl = signalInviteLink ?? telegramInviteLink ?? whatsAppInviteLink;
     subRoom.ready = new Date();
 };
 
@@ -714,9 +642,7 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
 appservice.on('room.message', async (roomId: string, event: any) => {
     if (!event['content']?.['msgtype']) return;
 
-    await catchSignalInviteLinks(roomId, event);
-    await catchTelegramInviteLinks(roomId, event);
-    await catchWhatsAppInviteLinks(roomId, event);
+    await catchInviteLinks(roomId, event);
 
     const subRoomInfo = findActiveSubRoom(roomId);
     if (subRoomInfo) {
