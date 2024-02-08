@@ -23,6 +23,8 @@ const HOMESERVER_NAME = process.env.HOMESERVER_NAME || 'localhost';
 const HOMESERVER_URL = process.env.HOMESERVER_URL || 'http://localhost:8008';
 const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_CONFIG = process.env.PATH_CONFIG || './config';
+const SUB_ROOMS_POOL_TARGET = typeof process.env.SUB_ROOMS_POOL_TARGET === 'string' ? Number.parseInt(process.env.SUB_ROOMS_POOL_TARGET) : 2;
+
 const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
 const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
 const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
@@ -384,7 +386,7 @@ export const fillUpSubRoomPool = () => {
             console.warn(`INTERNAL ERROR: No array of unclaimed sub room for network ${network}`)
             continue;
         }
-        const missing = Math.max(2 - unclaimedSubRoomsForThisNetwork.length, 0);
+        const missing = Math.max(SUB_ROOMS_POOL_TARGET - unclaimedSubRoomsForThisNetwork.length, 0);
         console.info(`Sub Room Pool: Creating ${missing} sub rooms for ${network}`);
         for (let i = 0; i < missing; i++) {
             createSubRoom({ network });
