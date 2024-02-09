@@ -163,6 +163,7 @@ export function CreatePolychat(props: { }) {
             <Button
                 type="submit"
                 variant="contained"
+                disabled={isFetching}
             >Create Invite</Button>
         </form>
     );
