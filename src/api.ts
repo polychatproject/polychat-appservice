@@ -185,7 +185,9 @@ api.get('/readyz', (req, res) => {
 
 api.get('/index.js', async (req, res) => {
     let text = await fsPromises.readFile('./public/index.js', 'utf-8');
-    text = text.replace(/https:\/\/join\.polychat\.de/g, API_JOIN_BASE_URL);
+    if (API_JOIN_BASE_URL !== 'https://join.polychat.de') {
+        text = text.replace(/https:\/\/join\.polychat\.de/g, API_JOIN_BASE_URL);
+    }
     res.type('html').end(text);
 });
 
