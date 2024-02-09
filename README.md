@@ -4,8 +4,12 @@ The bot written with ExpressJS in TypeScript.
 
 ## Run
 
-```
+```sh
+# Use npm to install the dependencies.
+# Bun fails to install `matrix-bot-sdk` correctly.
 npm install
+# Use bun to run this application.
+# Its written in TypeScript and there's no transpilation configured for NodeJS.
 bun run start
 ```
 
@@ -38,7 +42,31 @@ bun run start
 ### Experimental features
 * `LOAD_EXISTING_ROOMS` - Experimental!! Set to "true" to load existing rooms. Defaults to false.
 
+## Logging
+
+The project uses the JSON logger pino. It can be configured with a file called `$PATH_CONFIG/pino.json`.
+
+To learn about its configuration options, see https://getpino.io/#/docs/api?id=options.
+
+### Pretty CLI logging
+
+```sh
+# You may still need to install pino-pretty
+npm install --global pino-pretty
+
+# When you run it directly
+bun run start | pino-pretty
+
+# When you run it as a Docker container
+docker logs polychat-appservice | pino-pretty
+```
+
 ## Documentation
+
+There are
+* Main rooms - One per Polychat
+* Sub rooms - One per Polychat and Polychat user
+* Control rooms - One per Polychat user
 
 ### Sub Rooms
 

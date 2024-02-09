@@ -11,10 +11,10 @@ import {
     getEnabledNetworks,
     unclaimedSubRooms,
 } from '.';
+import { PATH_DATA } from './env';
 
 const log = logger.child({ name: 'api' });
 
-const PATH_DATA = process.env.PATH_DATA || './data';
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
 const API_JOIN_BASE_URL = process.env.API_JOIN_BASE_URL || 'https://join.polychat.de';
 

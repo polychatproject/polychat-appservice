@@ -14,6 +14,7 @@ import api from './api';
 import { logger } from './logger';
 import { GenericTransformer } from './transformers/generic';
 import { extractSignalInviteLink, extractTelegramInviteLink, extractWhatsAppInviteLink } from './invite-links';
+import { PATH_CONFIG, PATH_DATA } from './env';
 
 const log = logger.child({ name: 'appservice' });
 
@@ -24,8 +25,6 @@ const APPSERVICE_BIND_ADDRESS = process.env.APPSERVICE_BIND_ADDRESS || '0.0.0.0'
 const APPSERVICE_PORT = typeof process.env.APPSERVICE_PORT === 'string' ? Number.parseInt(process.env.APPSERVICE_PORT) : 9999;
 const HOMESERVER_NAME = process.env.HOMESERVER_NAME || 'localhost';
 const HOMESERVER_URL = process.env.HOMESERVER_URL || 'http://localhost:8008';
-const PATH_DATA = process.env.PATH_DATA || './data';
-const PATH_CONFIG = process.env.PATH_CONFIG || './config';
 const LOAD_EXISTING_ROOMS = process.env.LOAD_EXISTING_ROOMS === 'true';
 const SUB_ROOMS_POOL_TARGET = typeof process.env.SUB_ROOMS_POOL_TARGET === 'string' ? Number.parseInt(process.env.SUB_ROOMS_POOL_TARGET) : 2;
 
