@@ -18,7 +18,7 @@ bun run start
 * `API_PORT` - Publicly available provisioning API for the linker frontend. Defaults to 9998.
 * `APPSERVICE_BIND_ADDRESS` - The homeserver needs to be able to reach this. Defaults to "0.0.0.0".
 * `APPSERVICE_PORT` - The homeserver needs to be able to reach this. Defaults to 9999.
-* `DEBUG_MXID` - This Matrix User ID will get an invite to every room for debugging purposes. The appservice will ignore the user for most purposes, e.g. the !members command.
+* `DEBUG_MXID` - This Matrix User ID will get an invite to every room for debugging purposes. In sub rooms, this user can impersonate the Polychat user.
 * `HOMESERVER_NAME` - The homeserver name, e.g. "matrix.org".
 * `HOMESERVER_URL` - The best URL to reach the homeserver, e.g. https://matrix-client.matrix.org.
 * `PATH_DATA` - Folder path to persist data. Makes starting up faster and prevents events from being processed twice.
