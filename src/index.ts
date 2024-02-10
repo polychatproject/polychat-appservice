@@ -90,47 +90,42 @@ export type SubRoomUser = {
 });
 
 export type UnclaimedSubRoom = {
-    /**
-     * The MXID of the Polychat Bot
-     */
+    /** The MXID of the Polychat Bot */
     polychatUserId: string,
-    /**
-     * The network ID, e.g. "whatsapp"
-     */
+    /** The network ID, e.g. "whatsapp" */
     network: string,
-    /**
-     * The Matrix room ID
-     */
+    /** The Matrix room ID */
     roomId: string,
-    /**
-     * A URL we can give to the Polychat user for them to join the chat
-     */
+    /** A URL we can give to the user for them to join the chat */
     inviteUrl?: string,
-    /**
-     * When was this sub room created?
-     */
+    /** When was this sub room created? */
     timestampCreated: Date,
-    /**
-     * When was this sub room ready to be claimed?
-     */
+    /** When was this sub room ready to be claimed? */
     timestampReady?: Date,
-    /**
-     * Just for debugging rooms: What was the last status change?
-     */
+    /** Just for debugging rooms: What was the last status change? */
     lastDebugState: string,
 };
 
-export type ControlRoom = {
-    network: string,
-    ready?: Date,
-    roomId: string,
+export type ControlRoom = UnclaimedSubRoom & {
+    /** When was the sub room created? */
+    timestampClaimed: Date,
+    /** When did the user join the room? */
+    timestampJoined?: Date,
+    /** When did the  user leave the room? */
+    timestampLeft?: Date,
+    /** The MXID of the user */
+    userId?: string,
 };
 
 export type ClaimedSubRoom = UnclaimedSubRoom & {
+    /** When was the sub room created? */
     timestampClaimed: Date,
+    /** When did the user join the room? */
     timestampJoined?: Date,
+    /** When did the  user leave the room? */
     timestampLeft?: Date,
     user: SubRoomUser,
+    /** The MXID of the user */
     userId?: string,
 };
 
@@ -963,15 +958,20 @@ async function loadExistingRooms() {
                         timestampCreated: new Date(),
                         lastDebugState: 'Loaded existing room after polychat-appservice restart',
                     };
-                    log.debug('Found an existing Sub Room', subRoom);
+                    log.debug({ sub_room: subRoom}, 'Found an existing Sub Room');
                     allSubRooms.push(subRoom);
                 } else if (roomState?.content?.type === 'control') {
-                    // TODO: Add `ready`
+                    // TODO: Add `timestampCreated`
+                    // TODO: Add `timestampReady`
                     const controlRoom: ControlRoom = {
                         network: roomState.network,
+                        polychatUserId: intent.userId,
                         roomId,
+                        timestampCreated: new Date(),
+                        timestampClaimed: new Date(),
+                        lastDebugState: 'Loaded existing room after polychat-appservice restart',
                     };
-                    log.debug('Found an existing Control Room', controlRoom);
+                    log.debug({ control_room: controlRoom }, 'Found an existing Control Room');
                     allControlRooms.push(controlRoom);
                 }
             } catch (err) {
