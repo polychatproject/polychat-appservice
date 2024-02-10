@@ -127,7 +127,9 @@ export type ControlRoom = {
 };
 
 export type ClaimedSubRoom = UnclaimedSubRoom & {
-    claimed: Date,
+    timestampClaimed: Date,
+    timestampJoined?: Date,
+    timestampLeft?: Date,
     user: SubRoomUser,
     userId?: string,
 };
@@ -179,7 +181,7 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     unclaimedSubRoomsForThisNetwork.splice(subRoomIndex, 1);
     const claimedSubRoom: ClaimedSubRoom = {
         ...subRoom,
-        claimed: new Date(),
+        timestampClaimed: new Date(),
         user: typeof userDisplayName !== 'string' ? {
             localpartInMainRoom: uniqueId('polychat_'),
             identity: 'inherit',
@@ -268,15 +270,13 @@ const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, u
     if (user.identity === 'custom') {
         return user.displayName;
     }
-    const intent = appservice.getIntent(user.localpartInMainRoom);
-    try {
-        // TODO: The event is sometimes not found
-        const state = (await intent.underlyingClient.getRoomStateEvent(subRoom.roomId, 'm.room.member', intent.userId));
-        return state.displayname;
-    } catch (err) {
-        log.error({ err },`Error fetching the displayname of ${intent.userId} in the sub room ${subRoom.roomId}.`);
+    const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
+    const state = await safelyGetRoomStateEvent(intent.underlyingClient, subRoom.roomId, 'm.room.member', intent.userId);
+    if (!state || !state) {
+        log.error({ member_event_content: state }, `Error fetching the displayname of ${intent.userId} in the sub room ${subRoom.roomId}.`);
         return 'Polychat user';
     }
+    return state.displayname;
 };
 
 const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Polychat, event: any): Promise<void> => {
@@ -797,6 +797,8 @@ appservice.on('room.event', async (roomId: string, event: any) => {
                 if (subRoomInfo.subRoom.userId === undefined) {
                     localLog.info(`New user ${mxid} in sub room ${roomId}. This sub room now becomes active.`);
                     subRoomInfo.subRoom.userId = mxid;
+                    subRoomInfo.subRoom.timestampJoined = new Date();
+                    subRoomInfo.subRoom.timestampLeft = undefined;
                     subRoomInfo.subRoom.lastDebugState = 'Polychat user joined. Room is now active.';
                     const intent = appservice.getIntent(registration.sender_localpart);
                     const userIntent = appservice.getIntent(subRoomInfo.subRoom.user.localpartInMainRoom);
@@ -810,7 +812,8 @@ appservice.on('room.event', async (roomId: string, event: any) => {
                 }
             } else {
                 // We consider every other state a leave
-                if (subRoomInfo.subRoom.userId === mxid) {
+                if (subRoomInfo.subRoom.userId === mxid && subRoomInfo.subRoom.timestampLeft === undefined) {
+                    subRoomInfo.subRoom.timestampLeft = new Date();
                     localLog.info(`The Polychat user ${mxid} left its sub room ${roomId}.`);
                     const userIntent = appservice.getIntent(subRoomInfo.subRoom.user.localpartInMainRoom);
                     try {
