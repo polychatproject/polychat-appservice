@@ -193,10 +193,14 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     };
     const intent = appservice.getIntent(registration.sender_localpart);
     const userIntent = appservice.getIntent(claimedSubRoom.user.localpartInMainRoom);
+    const subRoomIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
     // TODO Rethink what the state key should be. It's not allowed to be an MXID.
     await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, subRoom.roomId, {
         room_id: subRoom.roomId,
         user_id: userIntent.userId,
+    });
+    await subRoomIntent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', {
+        name: polychat.name,
     });
     polychat.subRooms.push(claimedSubRoom);
     
@@ -423,7 +427,7 @@ export const createPolychat = async (opts: {name: string}): Promise<Polychat> =>
     const intent = appservice.getIntent(registration.sender_localpart);
 
     const mainRoomId = await intent.underlyingClient.createRoom({
-        name: `${opts.name} ${new Date().toISOString()}`,
+        name: opts.name,
         initial_state: [
             {
                 type: PolychatStateEventType.room,
@@ -608,7 +612,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
             polychatUserId: intent.userId,
             roomId,
             timestampCreated: new Date(),
-            lastDebugState: 'Created room'
+            lastDebugState: 'Created room',
         };
         unclaimedSubRooms.get('telegram')!.push(room);
 
