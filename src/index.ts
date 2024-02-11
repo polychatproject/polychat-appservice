@@ -678,7 +678,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         }
         const intent = appservice.getIntentForUserId(WHATSAPP_BRIDGE_ACCOUNT_MXIDS[0]!);
         const roomId = await intent.underlyingClient.createRoom({
-            name: opts.name || '', // Assumption: Like Telegram, WhatsApp requires groups to have a name
+            name: opts.name || '🌸 Polychat room', // Assumption: Like Telegram, WhatsApp requires groups to have a name
             initial_state: [
                 {
                     type: 'de.polychat.room',
