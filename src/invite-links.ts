@@ -14,8 +14,8 @@ export const extractSignalInviteLink = (event: any, bridgeBotMxid: string): stri
     }
     // Examples:
     // https://signal.group/#CjQKIBLIifvyWswZrG2GalWLYuY_slMXoJkcdcRHWX8tve-iEhAkZV_oH60OaQhcU1TD3mlq
-    // testo
-    const match = body.match(/https:\/\/signal\.group\/#[a-zA-Z0-9_-]+/);
+    // const match = body.match(/https:\/\/signal\.group\/#[a-zA-Z0-9_-]+/);
+    const match = body.match(/https:\/\/signal\.group\/#\S+$/);
     if (!match) {
         console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
@@ -37,7 +37,8 @@ export const extractTelegramInviteLink = (event: any, bridgeBotMxid: string): st
     // Examples:
     // https://t.me/+U6Yt2XIwPJxiODNi
     // https://t.me/+w_K5Tl6SPD1kN2Vi
-    const match = body.match(/https:\/\/t\.me\/\+[a-zA-Z0-9_]+/);
+    // const match = body.match(/https:\/\/t\.me\/\+[a-zA-Z0-9_]+/);
+    const match = body.match(/https:\/\/t\.me\/\+\S+$/);
     if (!match) {
         console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
@@ -62,7 +63,8 @@ export const extractWhatsAppInviteLink = (event: any, bridgeBotMxid: string): st
     // Examples:
     // https://chat.whatsapp.com/BzkM4rkDt1m2CxlgWpkbfl
     // https://chat.whatsapp.com/FJCRPV9PUEDBpFR5L5wIuz
-    const match = body.match(/https:\/\/chat\.whatsapp\.com\/[a-zA-Z0-9]+/);
+    // const match = body.match(/https:\/\/chat\.whatsapp\.com\/[a-zA-Z0-9]+/);
+    const match = body.match(/https:\/\/chat\.whatsapp\.com\/\S+$/);
     if (!match) {
         console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
