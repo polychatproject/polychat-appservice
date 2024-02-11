@@ -280,8 +280,13 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
         event: event.event_id,
     }, 'Called onMessageInClaimedSubRoom');
     const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
-    if (event.sender !== subRoom.userId && (DEBUG_MXID && event.sender === DEBUG_MXID)) {
-        // Ignore echo
+
+    // After the check, we assume the message is from the Polychat user.
+    const acceptedUsers = [subRoom.userId];
+    if (DEBUG_MXID) {
+        acceptedUsers.push(DEBUG_MXID);
+    }
+    if (!acceptedUsers.includes(event.sender)) {
         return;
     }
 
