@@ -287,6 +287,35 @@ const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, u
     return state.displayname;
 };
 
+/**
+ * Cross post a message into a debug room.
+ */
+const postMessageIntoDebugRoom = async (event: any) => {
+    const intent = appservice.getIntent(registration.sender_localpart);
+    // FIXME: Where to get the room ID from?
+    // const debugRoom = '!example:synapse';
+    if (!DEBUG_MXID) {
+        return;
+    }
+    // FIXME: This will likely create a new room for every message
+    const debugRoom = await intent.underlyingClient.dms.getOrCreateDm(DEBUG_MXID);
+
+    let newContent = {
+        ...event.content,
+        // Prefix optional body with sender info
+        ...(event.content.formatted_body && {
+            body: `${event.sender} in ${event.room}: ${event.content.body}`,
+        }),
+        // Prefix optional formatted_body with sender info
+        ...(event.content.formatted_body && {
+            formatted_body: `${event.sender} in ${event.room}:<br>${event.content.formatted_body}`
+        }),
+        // Relations will likely just cause issues, so let's remove them.
+        'm.relates_to': undefined,
+    };
+    await intent.underlyingClient.sendEvent(debugRoom, event.type, newContent);
+}
+
 const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Polychat, event: any): Promise<void> => {
     log.debug({
         polychat: polychat.mainRoomId,
@@ -295,11 +324,7 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
     const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
 
     if (event.sender === getBridgeBotMxid(subRoom.network)) {
-        const intent = appservice.getIntent(registration.sender_localpart);
-        // FIXME: Where to get the room ID from?
-        const debugRoom = '!example:synapse';
-        // Copy every message of the bridge bot into another room.
-        await intent.underlyingClient.sendEvent(debugRoom, event.type, event.content);
+        await postMessageIntoDebugRoom(event);
     }
 
     // After this check, we assume the message is from the Polychat user.
