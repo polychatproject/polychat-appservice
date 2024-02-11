@@ -1,3 +1,7 @@
+import { logger } from "./logger";
+
+const log = logger.child({ name: 'invite-links' });
+
 export const extractSignalInviteLink = (event: any, bridgeBotMxid: string): string | undefined => {
     // TODO This has not been tested and is an untested copy of catchTelegramInviteLinks
     if (event.content.msgtype !== 'm.notice') {
@@ -17,7 +21,7 @@ export const extractSignalInviteLink = (event: any, bridgeBotMxid: string): stri
     // const match = body.match(/https:\/\/signal\.group\/#[a-zA-Z0-9_-]+/);
     const match = body.match(/https:\/\/signal\.group\/#\S+$/);
     if (!match) {
-        console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
+        log.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
     }
     return match[0];
@@ -40,7 +44,7 @@ export const extractTelegramInviteLink = (event: any, bridgeBotMxid: string): st
     // const match = body.match(/https:\/\/t\.me\/\+[a-zA-Z0-9_]+/);
     const match = body.match(/https:\/\/t\.me\/\+\S+$/);
     if (!match) {
-        console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
+        log.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
     }
     return match[0];
@@ -66,7 +70,7 @@ export const extractWhatsAppInviteLink = (event: any, bridgeBotMxid: string): st
     // const match = body.match(/https:\/\/chat\.whatsapp\.com\/[a-zA-Z0-9]+/);
     const match = body.match(/https:\/\/chat\.whatsapp\.com\/\S+$/);
     if (!match) {
-        console.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
+        log.warn(`Our regular expression failed to capture this Invite URL: ${body}`);
         return;
     }
     return match[0];
