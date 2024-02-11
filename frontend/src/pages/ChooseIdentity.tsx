@@ -23,10 +23,12 @@ type ChooseMessengerProps = {
 };
 
 export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMessengerProps) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | undefined>();
     const [file, setFile] = useState<File>();
     const [identity, setIdentity] = useState('inherit');
     const [name, setName] = useState('');
-    const [loading, error, polychatData] = usePolychatData(polychatId);
+    const [loading, polychatDataError, polychatData] = usePolychatData(polychatId);
     const network = networks[networkId];
 
     const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -37,31 +39,39 @@ export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMesseng
     const handleSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
+        setError(undefined);
+        setBusy(true);
+
         const formData = new FormData();
         formData.append('identity', identity);
         formData.append('name', name);
         formData.append('avatar', file);
 
-        const res = await fetch(`${Bun.env.POLYCHAT_PROVISIONING_API}/api/2024-01/sub-room`, {
+        const res = await fetch(`${Bun.env.POLYCHAT_PROVISIONING_API}/api/2024-01/polychat/${encodeURIComponent(polychatId)}/${networkId}?action=join`, {
             body: formData as BodyInit,
             method: 'post',
         });
         if (!res.ok) {
             //FIXME: Add error state
+            setError(`HTTP Error ${res.status}`);
+            setBusy(false);
             return;
         }
         const data = await res.json();
 
         if (typeof data !== 'object' || !('url' in data) || typeof data.url !== 'string') {
             //FIXME: Add error state
+            setError(`HTTP Error ${res.status}`);
+            setBusy(false);
             return;
         }
 
+        setError(`Redirecting you to ${data.url}`);
         window.location.href = data.url;
     }, [identity, name, file]);
 
 
-    if (error) return <p>{error}</p>;
+    if (polychatDataError) return <p>{polychatDataError}</p>;
     if (!network) return <p>Invalid messenger. Please pick a different one.</p>;
     if (!polychatData) return <p>Loading…</p>;
 
@@ -126,6 +136,7 @@ export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMesseng
                 
                 <div style={{ textAlign: 'center' }}>
                     <Button
+                        disabled={busy}
                         startIcon={<network.icon />}
                         type="submit"
                         variant="contained"
@@ -133,6 +144,10 @@ export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMesseng
                         Join with {network.name}
                     </Button>
                 </div>
+
+                {error && (
+                    <p style={{color: 'red'}}>{error}</p>
+                )}
             </form>
 
             <div style={{ height: '24px' }} />
