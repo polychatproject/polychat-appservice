@@ -7,6 +7,7 @@ import {
     allPolychats,
     claimSubRoom,
     createPolychat,
+    shutDownPolychat,
     findMainRoom,
     getEnabledNetworks,
     unclaimedSubRooms,
@@ -78,12 +79,12 @@ api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
 /**
  * Get the info of a polychat.
  */
-api.get('/api/2024-01/polychat/:polychat', (req, res) => {
-    const polychat = findMainRoom(req.params.polychat.normalize());
-    log.info(`API: Requested Polychat ${req.params.polychat}`);
+api.get('/api/2024-01/polychat/:polychatId', (req, res) => {
+    const polychat = findMainRoom(req.params.polychatId.normalize());
+    log.info(`API: Requested Polychat ${req.params.polychatId}`);
     if (!polychat) {
         res.status(403).json({
-            errcode: 'E_CHANNEL_NOT_FOUND',
+            errcode: 'E_POLYCHAT_NOT_FOUND',
         });
         return;
     }
@@ -128,7 +129,7 @@ api.post('/api/2024-01/polychat/:polychatId/:networkId', upload.single('avatar')
     const polychat = findMainRoom(mainRoomId);
     if (!polychat) {
         res.status(403).json({
-            errcode: 'E_CHANNEL_NOT_FOUND',
+            errcode: 'E_POLYCHAT_NOT_FOUND',
         });
         return;
     }
@@ -161,6 +162,28 @@ api.get('/api/2024-01-debug/polychats', async (req, res) => {
     res.json({
         polychats: allPolychats(),
     });
+});
+
+api.get('/api/2024-01-debug/shut-down-polychat/:polychatId', async (req, res) => {
+    const polychat = findMainRoom(req.params.polychatId.normalize());
+    if (!polychat) {
+        res.status(403).json({
+            errcode: 'E_POLYCHAT_NOT_FOUND',
+        });
+        return;
+    }
+    log.info(`API: Shutting down polychat ${polychat.mainRoomId}`);
+    try {
+        await shutDownPolychat(polychat);
+        res.status(200).json({
+            ok: true,
+        });
+    } catch (err) {
+        log.error({ err }, 'Failed to end Polychat.');
+        res.status(500).json({
+            errcode: 'E_UNKNOWN',
+        });
+    }
 });
 
 /* START METRICS AND KUBERNETES */

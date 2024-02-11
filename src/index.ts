@@ -207,6 +207,29 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     return subRoom.inviteUrl!;
 }
 
+async function shutDownSubRoom(polychat: Polychat, subRoom: SubRoom) {
+    polychat.subRooms = polychat.subRooms.filter(s => s !== subRoom);
+    const mainRoomIntent = appservice.getIntent(registration.sender_localpart);
+    const subRoomIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
+    await mainRoomIntent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, subRoom.roomId, {});
+    // TODO: Unlink bridge, kick bridge bot or whatever needed to stop the link.
+    await subRoomIntent.leaveRoom(subRoom.roomId);
+}
+
+export async function shutDownPolychat(polychat: Polychat) {
+    const index = polychats.findIndex(p => p === polychat);
+    if (index === -1) {
+        return;
+    }
+    polychats.splice(index);
+    for (const subRoom of polychat.subRooms) {
+        await shutDownSubRoom(polychat, subRoom);
+    }
+    const intent = appservice.getIntent(registration.sender_localpart);
+    await intent.underlyingClient.sendNotice(polychat.mainRoomId, 'The administrator ended this Polychat.');
+    await intent.leaveRoom(polychat.mainRoomId);
+}
+
 function findActiveSubRoom(roomId: string): { polychat: Polychat, subRoom: ClaimedSubRoom } | undefined {
     for (const polychat of polychats) {
         const subRoom = polychat.subRooms.find(r => r.roomId === roomId);
