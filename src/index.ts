@@ -163,6 +163,19 @@ export function getEnabledNetworks(): string[] {
     return networks;
 }
 
+/**
+ * Returns the Matrix user ID of a bridge bot for a specific network.
+ * Each bridge has a bot user which responds to commands.
+ */
+export function getBridgeBotMxid(network: string): string | undefined {
+    switch(network) {
+        case 'irc': return IRC_BRIDGE_MXID;
+        case 'signal': return SIGNAL_BRIDGE_MXID;
+        case 'telegram': return TELEGRAM_BRIDGE_MXID;
+        case 'whatsapp': return WHATSAPP_BRIDGE_MXID;
+    }
+}
+
 export async function claimSubRoom(polychat: Polychat, network: Network, userDisplayName?: string): Promise<string> {
     const unclaimedSubRoomsForThisNetwork = unclaimedSubRooms.get(network);
     if (!Array.isArray(unclaimedSubRoomsForThisNetwork)) {
@@ -280,8 +293,17 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
         event: event.event_id,
     }, 'Called onMessageInClaimedSubRoom');
     const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
+
+    if (event.sender === getBridgeBotMxid(subRoom.network)) {
+        const intent = appservice.getIntent(registration.sender_localpart);
+        // FIXME: Where to get the room ID from?
+        const debugRoom = '!example:synapse';
+        // Copy every message of the bridge bot into another room.
+        await intent.underlyingClient.sendEvent(debugRoom, event.type, event.content);
+    }
+
+    // After this check, we assume the message is from the Polychat user.
     if (event.sender !== subRoom.userId && (DEBUG_MXID && event.sender === DEBUG_MXID)) {
-        // Ignore echo
         return;
     }
 
