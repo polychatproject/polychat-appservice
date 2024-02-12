@@ -983,7 +983,9 @@ async function loadExistingRooms() {
                         network: roomState.network,
                         polychatUserId: intent.userId,
                         roomId,
-                        timestampCreated: new Date(),
+                        timestampCreated: new Date(roomState.timestamp_created),
+                        timestampReady: typeof roomState.timestamp_ready === 'number' ? new Date(roomState.timestamp_ready) : undefined,
+                        timestampClaimed: typeof roomState.timestamp_claimed ? new Date(roomState.timestamp_claimed) : undefined,
                         lastDebugState: 'Loaded existing room after polychat-appservice restart',
                     };
                     log.debug({ sub_room: subRoom}, 'Found an existing Sub Room');
