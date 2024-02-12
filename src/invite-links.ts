@@ -58,7 +58,7 @@ export const extractWhatsAppInviteLink = (event: any, bridgeBotMxid: string): st
     const body = event.content.body as unknown;
     // TODO Verify that the bridge uses this text to start an invitation link response.
     // This was taken from the Telegram bridge.
-    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
+    if (typeof body !== 'string' || !body.startsWith('https://chat.whatsapp.com')) {
         return;
     }
     if (event.sender !== bridgeBotMxid) {
@@ -67,6 +67,7 @@ export const extractWhatsAppInviteLink = (event: any, bridgeBotMxid: string): st
     // Examples:
     // https://chat.whatsapp.com/BzkM4rkDt1m2CxlgWpkbfl
     // https://chat.whatsapp.com/FJCRPV9PUEDBpFR5L5wIuz
+    // https://chat.whatsapp.com/JiwNyshNQFQ5fIkTYQmiyd
     // const match = body.match(/https:\/\/chat\.whatsapp\.com\/[a-zA-Z0-9]+/);
     const match = body.match(/https:\/\/chat\.whatsapp\.com\/\S+$/);
     if (!match) {
