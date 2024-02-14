@@ -1010,14 +1010,16 @@ async function loadExistingRooms() {
         log.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
         for (const roomId of joinedRooms) {
             try {
-                const roomState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, PolychatStateEventType.room, '');
-                const nameState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, 'm.room.name', '');
-                const tombstoneState = await safelyGetRoomStateEvent(intent.underlyingClient, roomId, 'm.room.tombstone', '');
+                const allStateEvents = await intent.underlyingClient.getRoomState(roomId);
+                const roomState = allStateEvents.find(e => e.type === PolychatStateEventType.room && e.state_key === '')?.content;
+                const nameState = allStateEvents.find(e => e.type === 'm.room.name' && e.state_key === '')?.content;
+                const tombstoneState = allStateEvents.find(e => e.type === 'm.room.tombstone' && e.state_key === '')?.content;
                 if (tombstoneState?.replacement_room) {
                     log.info(`Ignore existing room ${roomId} because it has a tombstone and got replaced by ${tombstoneState.replacement_room}`);
                     continue;
                 }
                 if (roomState?.content?.type === 'main') {
+                    const participantStateEvents = allStateEvents.filter(e => e.type === PolychatStateEventType.participant);
                     const polychat: Polychat = {
                         mainRoomId: roomId,
                         name: nameState?.name, // TODO Could be undefined
