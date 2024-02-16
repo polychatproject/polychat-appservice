@@ -335,7 +335,7 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
             return;
         }
         try {
-            const network = match.groups!['network'] as Network; // TODO: unsafe case
+            const network = match.groups!['network'] as Network; // TODO: unsafe type cast
             const url = await claimSubRoom(polychat, network);
             await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, `Invite Url: ${url}`);
         } catch (error: any) {
