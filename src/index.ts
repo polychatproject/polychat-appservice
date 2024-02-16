@@ -954,34 +954,6 @@ appservice.on('room.event', async (roomId: string, event: any) => {
     }
 });
 
-async function hardcodedFootballCreationForChristian() {
-    const intent = appservice.getIntent(registration.sender_localpart);
-
-    await intent.underlyingClient.createRoom({
-        name: 'Football - User A',
-        room_alias_name: 'irc_#football-usera',
-        ...(DEBUG_MXID && {
-            invite: [DEBUG_MXID],
-        }),
-    });
-
-    await intent.underlyingClient.createRoom({
-        name: 'Football - User B',
-        room_alias_name: 'irc_#football-userb',
-        ...(DEBUG_MXID && {
-            invite: [DEBUG_MXID],
-        }),
-    });
-}
-
-async function hardcodedForRetreat() {
-    const polychat = await createPolychat({
-        name: 'Retreat in Binz',
-    });
-
-    fillUpSubRoomPool();
-}
-
 async function safelyGetRoomStateEvent(client: MatrixClient, roomId: string, type: string, stateKey: string): Promise<Record<string, any> | undefined> {
     try {
         return await client.getRoomStateEvent(roomId, type, stateKey);
