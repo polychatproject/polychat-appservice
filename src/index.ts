@@ -197,6 +197,7 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     const intent = appservice.getIntent(registration.sender_localpart);
     const userIntent = appservice.getIntent(claimedSubRoom.user.localpartInMainRoom);
     const subRoomIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
+    await userIntent.ensureRegistered();
     // TODO Rethink what the state key should be. It's not allowed to be an MXID.
     await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, subRoom.roomId, {
         room_id: subRoom.roomId,
@@ -364,7 +365,9 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
         return;
     }
 
-    const intent = appservice.getIntent(user.localpartInMainRoom);
+    const userIntent = appservice.getIntent(user.localpartInMainRoom);
+    // TODO This check should be redundant. Consider replacing it with proper error catching for better performance.
+    await userIntent.ensureRegisteredAndJoined(polychat.mainRoomId);
     try {
         const displayName = await getDisplayNameForPolychat(polychat, subRoom, user);
         await ensureDisplayNameInRoom(polychat.mainRoomId, user.localpartInMainRoom, displayName);
@@ -376,7 +379,7 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
     const cleanedContent = { ...event.content };
     delete cleanedContent['fi.mau.telegram.source'];
     
-    await intent.sendEvent(polychat.mainRoomId, cleanedContent);
+    await userIntent.sendEvent(polychat.mainRoomId, cleanedContent);
 };
 
 const transformer = new GenericTransformer();
@@ -873,7 +876,8 @@ appservice.on('room.event', async (roomId: string, event: any) => {
                     });
                     try {
                         await intent.underlyingClient.inviteUser(userIntent.userId, subRoomInfo.polychat.mainRoomId);
-                        await userIntent.underlyingClient.joinRoom(subRoomInfo.polychat.mainRoomId);
+                        // TODO This registered check should be redundant. Consider replacing it with proper error catching for better performance.
+                        await userIntent.ensureRegisteredAndJoined(subRoomInfo.polychat.mainRoomId);
                     } catch (err) {
                         localLog.error({ err }, `Failed to invite & join ${userIntent.userId} for ${mxid} in the main room ${subRoomInfo.polychat.mainRoomId}`);
                     }
@@ -890,6 +894,8 @@ appservice.on('room.event', async (roomId: string, event: any) => {
                         timestamp_left: subRoomInfo.subRoom.timestampLeft.getTime(),
                     });
                     try {
+                        // TODO This check should be redundant. Consider replacing it with proper error catching for better performance.
+                        await userIntent.ensureRegistered();
                         await userIntent.underlyingClient.leaveRoom(subRoomInfo.polychat.mainRoomId);
                     } catch (err) {
                         localLog.error({ err }, `Failed to leave ${userIntent.userId} for ${mxid} in the main room ${subRoomInfo.polychat.mainRoomId}`);
