@@ -20,20 +20,17 @@ try {
 export const logger = pino(options);
 
 const messageOrObjectToStringOrObject = (module: string, messageOrObject: any[]): Object => {
-    if (messageOrObject.every(o => typeof o === 'string' || typeof o === 'number' || typeof o === 'boolean')) {
-        return {
-            module,
-            msg: messageOrObject.join(' ')
-        };
-    }
+    const messages = messageOrObject.filter(o => typeof o === 'string' || typeof o === 'number' || typeof o === 'boolean');
+    const objects = messageOrObject.filter(o => typeof o === 'object');
     let result = {};
-    for (const obj of messageOrObject) {
+    for (const obj of objects) {
         result = {
             ...result,
             ...obj,
-        }
+        };
     }
     return {
+        msg: messages.join(' '), 
         ...result,
         module,
     };
@@ -45,23 +42,23 @@ export class LoggerForMatrixBotSdk implements ILogger {
     }
 
     public trace(module: string, ...messageOrObject: any[]) {
-        logger.trace(messageOrObjectToStringOrObject(module, messageOrObject));
+        this.logger.trace(messageOrObjectToStringOrObject(module, messageOrObject));
     }
 
     public debug(module: string, ...messageOrObject: any[]) {
-        logger.debug(messageOrObjectToStringOrObject(module, messageOrObject));
+        this.logger.debug(messageOrObjectToStringOrObject(module, messageOrObject));
     }
 
     public error(module: string, ...messageOrObject: any[]) {
-        logger.error(messageOrObjectToStringOrObject(module, messageOrObject));
+        this.logger.error(messageOrObjectToStringOrObject(module, messageOrObject));
     }
 
     public info(module: string, ...messageOrObject: any[]) {
-        logger.info(messageOrObjectToStringOrObject(module, messageOrObject));
+        this.logger.info(messageOrObjectToStringOrObject(module, messageOrObject));
     }
 
     public warn(module: string, ...messageOrObject: any[]) {
-        logger.warn(messageOrObjectToStringOrObject(module, messageOrObject));
+        this.logger.warn(messageOrObjectToStringOrObject(module, messageOrObject));
     }
 }
 
