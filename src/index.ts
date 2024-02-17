@@ -10,7 +10,7 @@ import {
     MatrixClient,
 } from 'matrix-bot-sdk';
 import { parse as parseYAML } from 'yaml';
-import { uniqueId } from './helper';
+import { isEmptyObject, uniqueId } from './helper';
 import api from './api';
 import { LoggerForMatrixBotSdk, logger } from './logger';
 import { GenericTransformer } from './transformers/generic';
@@ -1051,7 +1051,7 @@ async function loadExistingRooms(): Promise<void> {
     }[] = [];
     const allControlRooms: ControlRoom[] = [];
     for (const intent of intents) {
-        const joinedRooms = await intent.getJoinedRooms();
+        const joinedRooms = await intent.underlyingClient.getJoinedRooms();
         log.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
         for (const roomId of joinedRooms) {
             try {
@@ -1059,11 +1059,14 @@ async function loadExistingRooms(): Promise<void> {
                 const roomState = allStateEvents.find(e => e.type === PolychatStateEventType.room && e.state_key === '')?.content;
                 const nameState = allStateEvents.find(e => e.type === 'm.room.name' && e.state_key === '')?.content;
                 const tombstoneState = allStateEvents.find(e => e.type === 'm.room.tombstone' && e.state_key === '')?.content;
+                if (!roomState || isEmptyObject(roomState)) {
+                    continue;
+                }
                 if (tombstoneState?.replacement_room) {
                     log.info({ room_id: roomId }, `Ignore existing room ${roomId} because it has a tombstone and got replaced by ${tombstoneState.replacement_room}`);
                     continue;
                 }
-                if (roomState?.content?.type === 'main') {
+                if (roomState.type === 'main') {
                     const participantStateEvents = allStateEvents.filter(e => e.type === PolychatStateEventType.participant);
                     const polychat: Polychat = {
                         mainRoomId: roomId,
@@ -1075,7 +1078,7 @@ async function loadExistingRooms(): Promise<void> {
                         participantStateEvents,
                         polychat,
                     });
-                } else if (roomState?.content?.type === 'sub') {
+                } else if (roomState.type === 'sub') {
                     const subRoom: SubRoom = {
                         network: roomState.network,
                         polychatUserId: roomState.polychat_user_id,
@@ -1092,7 +1095,7 @@ async function loadExistingRooms(): Promise<void> {
                     };
                     log.debug({ sub_room: subRoom, room_id: roomId }, 'Found an existing Sub Room');
                     allSubRooms.push(subRoom);
-                } else if (roomState?.content?.type === 'control') {
+                } else if (roomState.type === 'control') {
                     const controlRoom: ControlRoom = {
                         network: roomState.network,
                         polychatUserId: intent.userId,
@@ -1115,9 +1118,9 @@ async function loadExistingRooms(): Promise<void> {
     for (const {participantStateEvents, polychat} of allPolychats) {
         try {
             for (const participantStateEvent of participantStateEvents) {
-                log.debug(`Evaluating if participant ${participantStateEvent.state_key} belongs to polychat ${polychat.mainRoomId}.`);
-                if (!participantStateEvent.content.room_id || typeof participantStateEvent.content.room_id !== 'string') {}
-                    log.debug(`Participant ${participantStateEvent.state_key} of polychat ${polychat.mainRoomId} is no longer in use and will be ignored.`);
+                log.info(`Evaluating if participant ${participantStateEvent.state_key} belongs to polychat ${polychat.mainRoomId}.`);
+                if (!participantStateEvent.content.room_id || typeof participantStateEvent.content.room_id !== 'string') {
+                    log.info(`Participant ${participantStateEvent.state_key} of polychat ${polychat.mainRoomId} is no longer in use and will be ignored.`);
                     continue;
                 }
                 const subRoom = allSubRooms.find(subRoom => subRoom.roomId === participantStateEvent.content.room_id);
@@ -1125,8 +1128,9 @@ async function loadExistingRooms(): Promise<void> {
                     log.error(`Did not find sub room ${participantStateEvent.content.room_id} for participant ${participantStateEvent.state_key} to add them to polychat ${polychat.mainRoomId}.`);
                     continue;
                 }
-                const claimedSubRoom = subRoom;
-                polychat.subRooms.push(subRoom);
+                // TODO Validate this unsafe type cast
+                const claimedSubRoom = subRoom as ClaimedSubRoom;
+                polychat.subRooms.push(claimedSubRoom);
             }
         } catch (err) {
             log.error({ err, room_id: polychat.mainRoomId }, `There was an unexpected error while loading the sub rooms for Polychat ${polychat.mainRoomId}`);
