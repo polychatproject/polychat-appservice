@@ -23,7 +23,7 @@ const theme = createTheme({
     palette: {
         mode: 'light',
         primary: {
-            main: '#ff003d',
+            main: '#ff005c',
         },
     },
 });
