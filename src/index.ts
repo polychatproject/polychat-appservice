@@ -170,6 +170,19 @@ export function getEnabledNetworks(): string[] {
 }
 
 /**
+ * Returns the Matrix user ID of a bridge bot for a specific network.
+ * Each bridge has a bot user which responds to commands.
+ */
+export function getBridgeBotMxid(network: string): string | undefined {
+    switch(network) {
+        case 'irc': return IRC_BRIDGE_MXID;
+        case 'signal': return SIGNAL_BRIDGE_MXID;
+        case 'telegram': return TELEGRAM_BRIDGE_MXID;
+        case 'whatsapp': return WHATSAPP_BRIDGE_MXID;
+    }
+}
+
+/**
  * Take a Sub Room from the pool of prepared Sub Rooms and assign it to one Polychat user and one Polychat.
  */
 export async function claimSubRoom(polychat: Polychat, network: Network, userDisplayName?: string): Promise<string> {
@@ -315,12 +328,45 @@ const getDisplayNameForPolychat = async (polychat: Polychat, subRoom: SubRoom, u
     return state.displayname;
 };
 
+/**
+ * Cross post a message into a debug room.
+ */
+const postMessageIntoDebugRoom = async (event: any) => {
+    const intent = appservice.getIntent(registration.sender_localpart);
+    // FIXME: Where to get the room ID from?
+    // const debugRoom = '!example:synapse';
+    if (!DEBUG_MXID) {
+        return;
+    }
+    // FIXME: This will likely create a new room for every message
+    const debugRoom = await intent.underlyingClient.dms.getOrCreateDm(DEBUG_MXID);
+
+    let newContent = {
+        ...event.content,
+        // Prefix optional body with sender info
+        ...(event.content.formatted_body && {
+            body: `${event.sender} in ${event.room}: ${event.content.body}`,
+        }),
+        // Prefix optional formatted_body with sender info
+        ...(event.content.formatted_body && {
+            formatted_body: `${event.sender} in ${event.room}:<br>${event.content.formatted_body}`
+        }),
+        // Relations will likely just cause issues, so let's remove them.
+        'm.relates_to': undefined,
+    };
+    await intent.underlyingClient.sendEvent(debugRoom, event.type, newContent);
+}
+
 const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Polychat, event: any): Promise<void> => {
     log.debug({
         polychat: polychat.mainRoomId,
         event: event.event_id,
     }, 'Called onMessageInClaimedSubRoom');
     const polychatIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
+
+    if (event.sender === getBridgeBotMxid(subRoom.network)) {
+        await postMessageIntoDebugRoom(event);
+    }
 
     // After the check, we assume the message is from the Polychat user.
     const acceptedUsers = [subRoom.userId];
