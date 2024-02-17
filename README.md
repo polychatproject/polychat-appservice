@@ -72,6 +72,37 @@ There are
 
 Stages:
 
-- `unclaimed` - The room has been prepared for a specific Polychat.
-- `claimed` - The room is assigned to a user who has not joined yet. We may not know the third-party identity of the user.
+- `unclaimed` - The Matrix room has been created and is linked to a 3rd-party network.
+- `claimed` - The room is assigned to a Polychat and a user who has not joined yet. We may not know the third-party identity of the user.
 - `active` - The room is actively bridged for a specific user.
+
+### State events
+
+#### Main room
+
+```json
+{
+    "type": "de.polychat.room",
+    "state_key": "",
+    "content": {
+
+    }
+}
+```
+
+##### Per attached sub room
+
+```json
+{
+    "type": "de.polychat.room.participant",
+    "state_key": "!abc:localhost",
+    "content": {
+        "room_id": "!abc:locahost",
+        "user_id": "@abc:localhost"
+    }
+}
+```
+
+* Ignore the `state_key``. It's just required to be unique.
+* Use `room_id` to identify the sub room.
+* Ignore the `user_id`. It might used in the future.
