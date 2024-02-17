@@ -522,11 +522,11 @@ export const createPolychat = async (opts: {name: string}): Promise<Polychat> =>
 };
 
 const createSubRoom = async (opts: {name?: string, network: Network}) => {
-    const localLog = log.child({
+    const log2 = log.child({
         function: 'createSubRoom',
         network: opts.network,
-    })
-    localLog.debug('Called createSubRoom');
+    });
+    log2.debug('Called createSubRoom');
     if (opts.network === 'irc') {
         if (!IRC_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
@@ -549,6 +549,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 },
             ],
         });
+        const log3 = log2.child({ room_id: roomId });
         if (DEBUG_MXID) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
@@ -557,23 +558,34 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
 
         const dmRoomId = await intent.underlyingClient.dms.getOrCreateDm(IRC_BRIDGE_MXID);
         if (DEBUG_MXID && !(await intent.underlyingClient.getJoinedRoomMembers(dmRoomId)).includes(DEBUG_MXID)) {
-            intent.underlyingClient.inviteUser(DEBUG_MXID, dmRoomId);
+            await intent.underlyingClient.inviteUser(DEBUG_MXID, dmRoomId);
         }
-        // TODO: Wait for join, then set up link
-        setTimeout(() => {
-            intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
-        }, 15000);
-        
-        unclaimedSubRooms.get('irc')!.push({
+
+        const room: UnclaimedSubRoom = {
             network: opts.network,
             polychatUserId: intent.userId,
             roomId,
             inviteUrl: `irc://${ircChannel}`,
             timestampCreated: new Date(),
             timestampReady: new Date(),
-            lastDebugState: 'Room created and optimistically marked as ready',
-        });
-        return;  
+            lastDebugState: 'Room created',
+        };
+        unclaimedSubRooms.get('irc')!.push(room);
+
+        // TODO: Wait for join, then set up link
+        setTimeout(async () => {
+            log3.info({ room_id: roomId }, `Send "!plumb" command to ${roomId}`);
+            try {
+                intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
+                room.lastDebugState = `Sent "!plumb" command and optimistically marked room as ready`;
+                log3.info({ room_id: roomId }, `Sent "!plumb" to ${roomId}`);
+                room.timestampReady = new Date();
+            } catch (err) {
+                log3.warn({ err, room_id: roomId }, `Failed to send "!plumb" request to ${roomId}`);
+                room.lastDebugState = 'Failed to send "!plumb" command';
+            }
+        }, 15000);
+        
     } else if (opts.network === 'signal') {
         if (!SIGNAL_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
@@ -596,18 +608,19 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 },
             ],
         });
+        const log3 = log2.child({ room_id: roomId });
         if (DEBUG_MXID) {
-            localLog.info(`Invite DEBUG_MXID to ${roomId}`);
+            log3.info(`Invite DEBUG_MXID to ${roomId}`);
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
-        localLog.info(`Invite SIGNAL_BRIDGE_MXID to ${roomId}`);
+        log3.info(`Invite SIGNAL_BRIDGE_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(SIGNAL_BRIDGE_MXID, roomId);
         
         // The Signal bot wants to be able to redact events
-        localLog.info(`Set power level of SIGNAL_BRIDGE_MXID to 50 in ${roomId}`);
+        log3.info(`Set power level of SIGNAL_BRIDGE_MXID to 50 in ${roomId}`);
         await intent.underlyingClient.setUserPowerLevel(SIGNAL_BRIDGE_MXID, roomId, 50);
-        localLog.info(`Join as SIGNAL_BRIDGE_TUG_MXID to ${roomId}`);
+        log3.info(`Join as SIGNAL_BRIDGE_TUG_MXID to ${roomId}`);
 
         const room: UnclaimedSubRoom = {
             network: opts.network,
@@ -620,25 +633,25 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
 
         // TODO: Wait for join, then set up link
         setTimeout(async () => {
-            localLog.info(`Send "create group" command to ${roomId}`);
+            log3.info(`Send "create group" command to ${roomId}`);
             try {
                 await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} create`);
                 room.lastDebugState = 'Sent "create group" command';
-                localLog.info(`Sent "create group" to ${roomId}`);
+                log3.info(`Sent "create group" to ${roomId}`);
                 // TODO: Wait for success, then get invite link
                 setTimeout(async () => {
-                    localLog.info(`Send "invite-link" to ${roomId}`);
+                    log3.info(`Send "invite-link" to ${roomId}`);
                     try {
                         await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} invite-link`);
                         room.lastDebugState = 'Sent "invite-link" command';
-                        localLog.info(`Sent "invite-link" to ${roomId}`);
+                        log3.info(`Sent "invite-link" to ${roomId}`);
                     } catch (err) {
-                        localLog.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
+                        log3.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
                         room.lastDebugState = 'Failed to send "invite-link" command';
                     }
                 }, 15000);
             } catch (err) {
-                localLog.warn({ err }, `Failed to send "create group" request to ${roomId}`);
+                log3.warn({ err }, `Failed to send "create group" request to ${roomId}`);
                 room.lastDebugState = 'Failed to send "create group" command';
             }
         }, 15000);
@@ -668,21 +681,22 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 },
             ],
         });
+        const log3 = log2.child({ room_id: roomId });
         if (DEBUG_MXID) {
-            localLog.info(`Invite DEBUG_MXID to ${roomId}`);
+            log3.info(`Invite DEBUG_MXID to ${roomId}`);
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
-        localLog.info(`Invite TELEGRAM_BRIDGE_MXID to ${roomId}`);
+        log3.info(`Invite TELEGRAM_BRIDGE_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_MXID, roomId);
         
         // The Telegram bot wants to be able to redact events
-        localLog.info(`Set power level of TELEGRAM_BRIDGE_MXID to 50 in ${roomId}`);
+        log3.info(`Set power level of TELEGRAM_BRIDGE_MXID to 50 in ${roomId}`);
         await intent.underlyingClient.setUserPowerLevel(TELEGRAM_BRIDGE_MXID, roomId, 50);
-        localLog.info(`Invite TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
+        log3.info(`Invite TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(TELEGRAM_BRIDGE_TUG_MXID, roomId);
         const tugIntent = appservice.getIntentForUserId(TELEGRAM_BRIDGE_TUG_MXID);
-        localLog.info(`Join as TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
+        log3.info(`Join as TELEGRAM_BRIDGE_TUG_MXID to ${roomId}`);
         await tugIntent.joinRoom(roomId);
 
         const room: UnclaimedSubRoom = {
@@ -696,31 +710,31 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
 
         // TODO: Wait for join, then set up link
         setTimeout(async () => {
-            localLog.info(`Send "create group" command to ${roomId}`);
+            log3.info(`Send "create group" command to ${roomId}`);
             try {
                 await intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} create group`);
                 room.lastDebugState = 'Sent "create group" command';
-                localLog.info(`Sent "create group" to ${roomId}`);
+                log3.info(`Sent "create group" to ${roomId}`);
                 // TODO: Wait for success, then get invite link
                 setTimeout(async () => {
-                    localLog.info(`Send "invite-link" to ${roomId}`);
+                    log3.info(`Send "invite-link" to ${roomId}`);
                     try {
                         await intent.underlyingClient.sendText(roomId, `${TELEGRAM_BRIDGE_COMMAND_PREFIX} invite-link`);
                         room.lastDebugState = 'Sent "invite-link" command';
-                        localLog.info(`Sent "invite-link" to ${roomId}`);
+                        log3.info(`Sent "invite-link" to ${roomId}`);
                     } catch (err) {
-                        localLog.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
+                        log3.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
                         room.lastDebugState = 'Failed to send "invite-link" command';
                     }
                     try {
                         await tugIntent.leaveRoom(roomId);
-                        localLog.info(`Left ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
+                        log3.info(`Left ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
                     } catch (err) {
-                        localLog.warn({ err }, `Failed to leave ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
+                        log3.warn({ err }, `Failed to leave ${roomId} as TELEGRAM_BRIDGE_TUG_MXID`);
                     }
                 }, 15000);
             } catch (err) {
-                localLog.warn({ err }, `Failed to send "create group" request to ${roomId}`);
+                log3.warn({ err }, `Failed to send "create group" request to ${roomId}`);
                 room.lastDebugState = 'Failed to send "create group" command';
             }
         }, 15000);
@@ -748,18 +762,19 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 },
             ],
         });
+        const log3 = log2.child({ room_id: roomId });
         if (DEBUG_MXID) {
-            localLog.info(`Invite DEBUG_MXID to ${roomId}`);
+            log3.info(`Invite DEBUG_MXID to ${roomId}`);
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
         }
-        localLog.info(`Invite WHATSAPP_BRIDGE_MXID to ${roomId}`);
+        log3.info(`Invite WHATSAPP_BRIDGE_MXID to ${roomId}`);
         await intent.underlyingClient.inviteUser(WHATSAPP_BRIDGE_MXID, roomId);
         
         // The WhatsApp bot wants to be able to redact events
-        localLog.info(`Set power level of WHATSAPP_BRIDGE_MXID to 50 in ${roomId}`);
+        log3.info(`Set power level of WHATSAPP_BRIDGE_MXID to 50 in ${roomId}`);
         await intent.underlyingClient.setUserPowerLevel(WHATSAPP_BRIDGE_MXID, roomId, 50);
-        localLog.info(`Join as WHATSAPP_BRIDGE_TUG_MXID to ${roomId}`);
+        log3.info(`Join as WHATSAPP_BRIDGE_TUG_MXID to ${roomId}`);
 
         const room: UnclaimedSubRoom = {
             network: opts.network,
@@ -773,24 +788,24 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         // TODO: Wait for join, then set up link
         setTimeout(async () => {
             try {
-                localLog.info(`Send "create" command to ${roomId}`);
+                log3.info(`Send "create" command to ${roomId}`);
                 await intent.underlyingClient.sendText(roomId, `${WHATSAPP_BRIDGE_COMMAND_PREFIX} create`);
                 room.lastDebugState = 'Sent "create" command';
-                localLog.info(`Sent "create" to ${roomId}`);
+                log3.info(`Sent "create" to ${roomId}`);
                 // TODO: Wait for link, then get invite link
                 setTimeout(async () => {
                     try {
-                        localLog.info(`Send "invite-link" to ${roomId}`);
+                        log3.info(`Send "invite-link" to ${roomId}`);
                         await intent.underlyingClient.sendText(roomId, `${WHATSAPP_BRIDGE_COMMAND_PREFIX} invite-link`);
                         room.lastDebugState = 'Sent "invite-link" command';
-                        localLog.info(`Sent "invite-link" to ${roomId}`);
+                        log3.info(`Sent "invite-link" to ${roomId}`);
                     } catch (err) {
-                        localLog.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
+                        log3.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
                         room.lastDebugState = 'Failed to send "invite-link" command';
                     }
                 }, 15000);
             } catch (err) {
-                localLog.warn({ err }, `Failed to send "create" request to ${roomId}`);
+                log3.warn({ err }, `Failed to send "create" request to ${roomId}`);
                 room.lastDebugState = 'Failed to send "create" command';
             }
         }, 15000);
@@ -861,14 +876,14 @@ appservice.on('room.message', async (roomId: string, event: any): Promise<void> 
 });
 
 const onEvent = async (roomId: string, event: any): Promise<void> => {
-    log.debug({ event }, 'room.event');
+    log.debug({ event, function: 'onEvent' }, 'incoming room.event');
 
     if (event['type'] === 'm.room.member' && typeof event['state_key'] === 'string') {
         const mxid = event['state_key'];
         // Sub room: Member joined or left
         const subRoomInfo = findActiveSubRoom(roomId);
         if (subRoomInfo) {
-            const localLog = log.child({
+            const log2 = log.child({
                 polychat: subRoomInfo.polychat.mainRoomId,
                 sub_room: roomId,
                 user_id: mxid,
@@ -894,24 +909,24 @@ const onEvent = async (roomId: string, event: any): Promise<void> => {
                 systemUsers.push(DEBUG_MXID);
             }
             if (systemUsers.includes(mxid)) {
-                localLog.debug(`Ignoring membership change of system user ${mxid} in sub room ${roomId}`);
+                log2.debug(`Ignoring membership change of system user ${mxid} in sub room ${roomId}`);
                 return;
             }
             if (event.content.membership === 'join') {
                 if (subRoomInfo.subRoom.userId && mxid !== subRoomInfo.subRoom.userId) {
-                    localLog.info(`New user ${mxid} in sub room ${roomId}, but the room is already taken by ${subRoomInfo.subRoom.userId}. Kicking the new user...`);
+                    log2.info(`New user ${mxid} in sub room ${roomId}, but the room is already taken by ${subRoomInfo.subRoom.userId}. Kicking the new user...`);
                     const intent = appservice.getIntentForUserId(subRoomInfo.subRoom.polychatUserId);
                     subRoomInfo.subRoom.lastDebugState = 'Another user joined the active room and had to be kicked';
                     try {
                         await intent.underlyingClient.kickUser(mxid, roomId, 'This Polychat sub room is already in use by someone else.');
                     } catch (err) {
-                        localLog.warn(`Failed to kick ${mxid} from the sub room ${roomId} which belongs to ${subRoomInfo.subRoom.userId}`);
+                        log2.warn(`Failed to kick ${mxid} from the sub room ${roomId} which belongs to ${subRoomInfo.subRoom.userId}`);
                         subRoomInfo.subRoom.lastDebugState = 'Another user joined the active room but we failed to kick them';
                     }
                     return;
                 }
                 if (subRoomInfo.subRoom.userId === undefined) {
-                    localLog.info(`New user ${mxid} in sub room ${roomId}. This sub room now becomes active.`);
+                    log2.info(`New user ${mxid} in sub room ${roomId}. This sub room now becomes active.`);
                     subRoomInfo.subRoom.userId = mxid;
                     subRoomInfo.subRoom.timestampJoined = new Date();
                     subRoomInfo.subRoom.timestampLeft = undefined;
@@ -929,7 +944,7 @@ const onEvent = async (roomId: string, event: any): Promise<void> => {
                         // TODO This registered check should be redundant. Consider replacing it with proper error catching for better performance.
                         await userIntent.ensureRegisteredAndJoined(subRoomInfo.polychat.mainRoomId);
                     } catch (err) {
-                        localLog.error({ err }, `Failed to invite & join ${userIntent.userId} for ${mxid} in the main room ${subRoomInfo.polychat.mainRoomId}`);
+                        log2.error({ err }, `Failed to invite & join ${userIntent.userId} for ${mxid} in the main room ${subRoomInfo.polychat.mainRoomId}`);
                     }
                     return;
                 }
@@ -937,7 +952,7 @@ const onEvent = async (roomId: string, event: any): Promise<void> => {
                 // We consider every other state a leave
                 if (subRoomInfo.subRoom.userId === mxid && subRoomInfo.subRoom.timestampLeft === undefined) {
                     subRoomInfo.subRoom.timestampLeft = new Date();
-                    localLog.info(`The Polychat user ${mxid} left its sub room ${roomId}.`);
+                    log2.info(`The Polychat user ${mxid} left its sub room ${roomId}.`);
                     const userIntent = appservice.getIntent(subRoomInfo.subRoom.user.localpartInMainRoom);
                     const subRoomIntent = appservice.getIntentForUserId(subRoomInfo.subRoom.polychatUserId);
                     await patchSubRoomState(subRoomIntent.underlyingClient, roomId, {
@@ -948,7 +963,7 @@ const onEvent = async (roomId: string, event: any): Promise<void> => {
                         await userIntent.ensureRegistered();
                         await userIntent.underlyingClient.leaveRoom(subRoomInfo.polychat.mainRoomId);
                     } catch (err) {
-                        localLog.error({ err }, `Failed to leave ${userIntent.userId} for ${mxid} in the main room ${subRoomInfo.polychat.mainRoomId}`);
+                        log2.error({ err }, `Failed to leave ${userIntent.userId} for ${mxid} in the main room ${subRoomInfo.polychat.mainRoomId}`);
                     }
                 }
             }
@@ -1034,7 +1049,7 @@ async function safelyGetRoomStateEvent(client: MatrixClient, roomId: string, typ
 }
 
 async function loadExistingRooms(): Promise<void> {
-    log.info('Called loadExistingRooms');
+    log.debug('Called loadExistingRooms');
     log.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
     const intents = [
         appservice.getIntent(registration.sender_localpart),
