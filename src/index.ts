@@ -585,7 +585,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 room.lastDebugState = 'Failed to send "!plumb" command';
             }
         }, 15000);
-        
+
     } else if (opts.network === 'signal') {
         if (!SIGNAL_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
@@ -655,7 +655,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 room.lastDebugState = 'Failed to send "create group" command';
             }
         }, 15000);
-        return;
+
     } else if (opts.network === 'telegram') {
         if (!TELEGRAM_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
@@ -739,7 +739,6 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
             }
         }, 15000);
 
-        return;
     } else if (opts.network === 'whatsapp') {
         if (!WHATSAPP_BRIDGE_MXID) {
             throw Error(`Network not configured: ${opts.network}`);
@@ -809,8 +808,10 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 room.lastDebugState = 'Failed to send "create" command';
             }
         }, 15000);
+
+    } else {
+        throw Error(`Network not implemented: ${opts.network}`);
     }
-    throw Error(`Network not implemented: ${opts.network}`);
 }
 
 const onMessageInControlRoom = async (roomId: string, event: any): Promise<void> => {
