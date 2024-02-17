@@ -56,10 +56,12 @@ api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
         res.status(403).json({
             errcode: 'E_NAME_MISSING',
         });
+        return;
     }
+    const roomName = req.body.name as string;
     try {
         const polychat = await createPolychat({
-            name: req.body.name.normalize(),
+            name: roomName,
         });
         log.info(`API: Created Polychat ${polychat.mainRoomId}`);
         res.json({
@@ -69,7 +71,10 @@ api.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
             name: polychat.name,
         });
     } catch (err) {
-        log.warn({ err }, 'Failed to create Polychat');
+        log.error({
+            err,
+            requested_room_name: roomName,
+        }, 'Failed to create Polychat');
         res.status(500).json({
             errcode: 'E_INTERNAL_ERROR',
         });
