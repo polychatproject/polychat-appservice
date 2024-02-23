@@ -6,11 +6,5 @@
      "body":"Invite link to Polychat room: https://t.me/+O_22QPKlYkswYzAy",
      "format":"org.matrix.custom.html",
      "formatted_body":"<p>Invite link to Polychat room: https://t.me/+O_22QPKlYkswYzAy</p>\n"
-  },
-  "origin_server_ts":1708502192017,
-  "unsigned":{
-     "age":209127107
-  },
-  "event_id":"$SOME_EVENT_ID",
-  "room_id":"!SOME_ROOM_ID"
+  }
 }
