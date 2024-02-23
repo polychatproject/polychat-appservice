@@ -3,3 +3,7 @@
 /config
 
 /public/index.js
+
+
+.idea
+/frontend/package-lock.json
