@@ -1,0 +1,14 @@
+{
+  "type": "m.room.message",
+  "sender": "@telegrambot:polychat.de",
+  "content": {
+    "msgtype": "m.notice",
+    "body": "Telegram chat created. ID: 4115892149"
+  },
+  "origin_server_ts": 1708502183423,
+  "unsigned": {
+    "age": 209135701
+  },
+  "event_id": "$SOME_EVENT_ID",
+  "room_id": "!SOME_ROOM_ID"
+}

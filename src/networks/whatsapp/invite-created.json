@@ -1,0 +1,14 @@
+{
+  "type": "m.room.message",
+  "sender": "@whatsappbot:polychat.de",
+  "content": {
+    "msgtype": "m.notice",
+    "body": "https://chat.whatsapp.com/Ig5JoJvyT9V91fCH50skB4"
+  },
+  "origin_server_ts": 1708502191401,
+  "unsigned": {
+    "age": 209147293
+  },
+  "event_id": "$SOME_EVENT_ID",
+  "room_id": "!SOME_ROOM_ID"
+}

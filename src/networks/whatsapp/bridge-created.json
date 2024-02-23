@@ -1,0 +1,14 @@
+{
+  "type": "m.room.message",
+  "sender": "@whatsappbot:polychat.de",
+  "content": {
+    "msgtype": "m.notice",
+    "body": "Successfully created WhatsApp group 111111111111@g.us"
+  },
+  "origin_server_ts": 1,
+  "unsigned": {
+    "age": 1
+  },
+  "event_id": "$SOMEEVENTID",
+  "room_id": "!SOMEROOMID"
+}
