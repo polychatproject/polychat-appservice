@@ -987,6 +987,7 @@ async function loadExistingRooms(): Promise<void> {
         ...TELEGRAM_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
         ...WHATSAPP_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
     ];
+    log.debug('loadExistingRooms: set the intents');
     let foundRooms: CategorizedRooms = {
         unclaimedSubRooms: [],
         claimedSubRooms: [],
