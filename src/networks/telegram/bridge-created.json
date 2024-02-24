@@ -1,0 +1,8 @@
+{
+  "type": "m.room.message",
+  "sender": "@telegrambot:polychat.de",
+  "content": {
+    "msgtype": "m.notice",
+    "body": "Telegram chat created. ID: 4115892149"
+  }
+}

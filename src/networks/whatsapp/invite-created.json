@@ -1,0 +1,8 @@
+{
+  "type": "m.room.message",
+  "sender": "@whatsappbot:polychat.de",
+  "content": {
+    "msgtype": "m.notice",
+    "body": "https://chat.whatsapp.com/Ig5JoJvyT9V91fCH50skB4"
+  }
+}

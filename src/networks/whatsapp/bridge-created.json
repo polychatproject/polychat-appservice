@@ -1,0 +1,8 @@
+{
+  "type": "m.room.message",
+  "sender": "@whatsappbot:polychat.de",
+  "content": {
+    "msgtype": "m.notice",
+    "body": "Successfully created WhatsApp group 111111111111@g.us"
+  }
+}
