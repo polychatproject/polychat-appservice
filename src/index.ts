@@ -8,15 +8,16 @@ import {
     SimpleRetryJoinStrategy,
     AutojoinRoomsMixin,
     MatrixClient,
-    Intent,
 } from 'matrix-bot-sdk';
 import { parse as parseYAML } from 'yaml';
-import { isEmptyObject, uniqueId } from './helper';
+import { uniqueId } from './helper';
 import api from './api';
 import { LoggerForMatrixBotSdk, logger } from './logger';
 import { GenericTransformer } from './transformers/generic';
 import { extractSignalInviteLink, extractTelegramInviteLink, extractWhatsAppInviteLink } from './invite-links';
 import { PATH_CONFIG, PATH_DATA } from './env';
+import { CategorizedRooms, categorizeExistingRoom } from './load-existing-rooms';
+import { ClaimedSubRoom, Network, Polychat, PolychatStateEventType, SubRoom, SubRoomUser, UnclaimedSubRoom } from './types';
 
 const log = logger.child({ name: 'appservice' });
 
@@ -47,13 +48,6 @@ const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
 const WHATSAPP_BRIDGE_ACCOUNT_MXIDS = typeof process.env.WHATSAPP_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.WHATSAPP_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
 const WHATSAPP_BRIDGE_COMMAND_PREFIX = process.env.WHATSAPP_BRIDGE_COMMAND_PREFIX || '!wa';
 
-type Network = 'irc' | 'signal' | 'telegram' | 'whatsapp';
-
-enum PolychatStateEventType {
-    room = 'de.polychat.room',
-    participant = 'de.polychat.room.participant',
-};
-
 log.debug('IRC_BRIDGE_MXID', IRC_BRIDGE_MXID);
 log.debug('SIGNAL_BRIDGE_MXID', SIGNAL_BRIDGE_MXID);
 log.debug('TELEGRAM_BRIDGE_MXID', TELEGRAM_BRIDGE_MXID);
@@ -70,66 +64,6 @@ const appservice = new Appservice({
     storage: new SimpleFsStorageProvider(path.join(PATH_DATA, 'appservice.json')), // or any other IAppserviceStorageProvider
     joinStrategy: new SimpleRetryJoinStrategy(), // just to ensure reliable joins
 });
-
-
-export type SubRoomUser = {
-    localpartInMainRoom: string,
-} & ({
-    identity: 'inherit',
-} | {
-    identity: 'custom',
-    displayName: string,
-    avatar: string,
-});
-
-export type UnclaimedSubRoom = {
-    /** The MXID of the Polychat Bot */
-    polychatUserId: string,
-    /** The network ID, e.g. "whatsapp" */
-    network: Network,
-    /** The Matrix room ID */
-    roomId: string,
-    /** A URL we can give to the user for them to join the chat */
-    inviteUrl?: string,
-    /** When was this sub room created? */
-    timestampCreated: Date,
-    /** When was this sub room ready to be claimed? */
-    timestampReady?: Date,
-    /** Just for debugging rooms: What was the last status change? */
-    lastDebugState: string,
-};
-
-export type ControlRoom = UnclaimedSubRoom & {
-    /** When was the sub room created? */
-    timestampClaimed: Date,
-    /** When did the user join the room? */
-    timestampJoined?: Date,
-    /** When did the  user leave the room? */
-    timestampLeft?: Date,
-    /** The MXID of the user */
-    userId?: string,
-};
-
-export type ClaimedSubRoom = UnclaimedSubRoom & {
-    /** When was the sub room created? */
-    timestampClaimed: Date,
-    /** When did the user join the room? */
-    timestampJoined?: Date,
-    /** When did the user leave the room? */
-    timestampLeft?: Date,
-    user: SubRoomUser,
-    /** The MXID of the user (controlled by a bridge). Only available after they joined. */
-    userId?: string,
-};
-
-export type SubRoom = UnclaimedSubRoom | ClaimedSubRoom;
-
-export type Polychat = {
-    name: string,
-    avatar?: string,
-    mainRoomId: string,
-    subRooms: ClaimedSubRoom[],
-};
 
 const polychats: Polychat[] = [];
 export const unclaimedSubRooms: Map<Network, UnclaimedSubRoom[]> = new Map([
@@ -198,7 +132,15 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     });
     await patchSubRoomState(subRoomIntent.underlyingClient, subRoom.roomId, {
         timestamp_claimed: claimedSubRoom.timestampClaimed.getTime(),
-        user: claimedSubRoom.user,
+        user: claimedSubRoom.user.identity === 'inherit' ? {
+            identity: claimedSubRoom.user.identity,
+            localpart_in_main_room: claimedSubRoom.user.localpartInMainRoom,
+        } : {
+            identity: claimedSubRoom.user.identity,
+            localpart_in_main_room: claimedSubRoom.user.localpartInMainRoom,
+            display_name: claimedSubRoom.user.displayName,
+            avatar: claimedSubRoom.user.avatar,
+        },
     });
     polychat.subRooms.push(claimedSubRoom);
     
@@ -1036,84 +978,6 @@ async function safelyGetRoomStateEvent(client: MatrixClient, roomId: string, typ
     }
 }
 
-type CategorizedRooms = {
-    unclaimedSubRooms: UnclaimedSubRoom[],
-    claimedSubRooms: ClaimedSubRoom[],
-    polychats: {
-        participantStateEvents: Record<string, any>[],
-        polychat: Polychat,
-    }[],
-    controlRooms: ControlRoom[],
-}
-
-async function categorizeExistingRoom(intent: Intent, roomId: string): Promise<CategorizedRooms> {
-    const result: CategorizedRooms = {
-        unclaimedSubRooms: [],
-        claimedSubRooms: [],
-        polychats: [],
-        controlRooms: [],
-    };
-    const allStateEvents = await intent.underlyingClient.getRoomState(roomId);
-    const roomState = allStateEvents.find(e => e.type === PolychatStateEventType.room && e.state_key === '')?.content;
-    const nameState = allStateEvents.find(e => e.type === 'm.room.name' && e.state_key === '')?.content;
-    const tombstoneState = allStateEvents.find(e => e.type === 'm.room.tombstone' && e.state_key === '')?.content;
-    if (!roomState || isEmptyObject(roomState)) {
-        return result;
-    }
-    if (tombstoneState?.replacement_room) {
-        log.info({ room_id: roomId }, `Ignore existing room ${roomId} because it has a tombstone and got replaced by ${tombstoneState.replacement_room}`);
-        return result;
-    }
-    if (roomState.type === 'main') {
-        const participantStateEvents = allStateEvents.filter(e => e.type === PolychatStateEventType.participant);
-        const polychat: Polychat = {
-            mainRoomId: roomId,
-            name: nameState?.name, // TODO Could be undefined
-            subRooms: [],
-        };
-        log.info({ polychat: polychat, room_id: roomId }, 'Found an existing Polychat / Main Room', polychat);
-        result.polychats.push({
-            participantStateEvents,
-            polychat,
-        });
-    } else if (roomState.type === 'sub') {
-        const subRoom: SubRoom = {
-            network: roomState.network,
-            polychatUserId: roomState.polychat_user_id,
-            roomId,
-            timestampCreated: new Date(roomState.timestamp_created),
-            timestampReady: typeof roomState.timestamp_ready === 'number' ? new Date(roomState.timestamp_ready) : undefined,
-            timestampClaimed: typeof roomState.timestamp_claimed === 'number' ? new Date(roomState.timestamp_claimed) : undefined,
-            timestampJoined: typeof roomState.timestamp_joined === 'number' ? new Date(roomState.timestamp_joined) : undefined,
-            timestampLeft: typeof roomState.timestamp_left === 'number' ? new Date(roomState.timestamp_left) : undefined,
-            lastDebugState: 'Loaded existing room after polychat-appservice restart',
-            userId: roomState.user_id,
-            // TODO: Restore user correctly
-            user: roomState.user,
-        };
-        if ('timestampClaimed' in subRoom) {
-            log.debug({ sub_room: subRoom, room_id: roomId }, 'Found an existing Claimed Sub Room');
-            result.claimedSubRooms.push(subRoom);
-        } else {
-            log.debug({ sub_room: subRoom, room_id: roomId }, 'Found an existing Unclaimed Sub Room');
-            result.unclaimedSubRooms.push(subRoom);
-        }
-    } else if (roomState.type === 'control') {
-        const controlRoom: ControlRoom = {
-            network: roomState.network,
-            polychatUserId: intent.userId,
-            roomId,
-            timestampCreated: new Date(roomState.timestamp_created),
-            timestampReady: typeof roomState.timestamp_ready === 'number' ? new Date(roomState.timestamp_ready) : undefined,
-            timestampClaimed: new Date(roomState.timestamp_claimed),
-            lastDebugState: 'Loaded existing room after polychat-appservice restart',
-        };
-        log.debug({ control_room: controlRoom, room_id: roomId }, 'Found an existing Control Room');
-        result.controlRooms.push(controlRoom);
-    }
-    return result;
-}
-
 async function loadExistingRooms(): Promise<void> {
     log.debug('Called loadExistingRooms');
     log.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
@@ -1134,7 +998,8 @@ async function loadExistingRooms(): Promise<void> {
         log.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
         for (const roomId of joinedRooms) {
             try {
-                const newRooms = await categorizeExistingRoom(intent, roomId);
+                const allStateEvents = await intent.underlyingClient.getRoomState(roomId);
+                const newRooms = await categorizeExistingRoom(roomId, allStateEvents);
                 foundRooms = {
                     unclaimedSubRooms: [
                         ...foundRooms.unclaimedSubRooms,
