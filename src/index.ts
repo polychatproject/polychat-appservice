@@ -1033,12 +1033,17 @@ async function loadExistingRooms(): Promise<void> {
     log.info('loadExistingRooms: END: Load room state of joined rooms');
 
     // TODO: This shouldn't be needed, but might catch a bug or failed operation.
-    log.info(`loadExistingRooms: START: Ensure all polychat accounts are registered`);
+    log.info(`loadExistingRooms: START: Ensure all localpartInMainRoom are registered`);
     for (const claimedSubRoom of foundRooms.claimedSubRooms) {
-        const intent = appservice.getIntent(claimedSubRoom.polychatUserId);
-        await intent.ensureRegistered();
+        const intent = appservice.getIntent(claimedSubRoom.user.localpartInMainRoom);
+        try {
+            await intent.ensureRegistered();
+        } catch (err) {
+            const mxid = intent.userId;
+            log.error({ err, mxid }, `loadExistingRooms: Failed to register ${mxid}`);
+        }
     }
-    log.info(`loadExistingRooms: DONE: Ensure all polychat accounts are registered`);
+    log.info(`loadExistingRooms: DONE: Ensure all localpartInMainRoom are registered`);
 
     log.info(`loadExistingRooms: START: Link polychats and claimed Sub Rooms`);
     for (const {participantStateEvents, polychat} of foundRooms.polychats) {
