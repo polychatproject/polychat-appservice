@@ -983,11 +983,11 @@ async function loadExistingRooms(): Promise<void> {
     log.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
     const intents = [
         appservice.getIntent(registration.sender_localpart),
-        ...SIGNAL_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
-        ...TELEGRAM_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
-        ...WHATSAPP_BRIDGE_ACCOUNT_MXIDS.map(appservice.getIntentForUserId),
+        ...SIGNAL_BRIDGE_ACCOUNT_MXIDS.map(mxid => appservice.getIntentForUserId(mxid)),
+        ...TELEGRAM_BRIDGE_ACCOUNT_MXIDS.map(mxid => appservice.getIntentForUserId(mxid)),
+        ...WHATSAPP_BRIDGE_ACCOUNT_MXIDS.map(mxid => appservice.getIntentForUserId(mxid)),
     ];
-    log.debug('loadExistingRooms: set the intents');
+    log.debug('loadExistingRooms: Set the intents');
     let foundRooms: CategorizedRooms = {
         unclaimedSubRooms: [],
         claimedSubRooms: [],
