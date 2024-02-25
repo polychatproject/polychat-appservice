@@ -10,13 +10,13 @@ import {
     MatrixClient,
 } from 'matrix-bot-sdk';
 import { parse as parseYAML } from 'yaml';
-import { uniqueId } from './helper';
 import api from './api';
 import { LoggerForMatrixBotSdk, logger } from './logger';
-import { GenericTransformer } from './transformers/generic';
-import { extractSignalInviteLink, extractTelegramInviteLink, extractWhatsAppInviteLink } from './invite-links';
 import { PATH_CONFIG, PATH_DATA } from './env';
+import { uniqueId } from './helper';
+import { extractSignalInviteLink, extractTelegramInviteLink, extractWhatsAppInviteLink } from './invite-links';
 import { CategorizedRooms, categorizeExistingRoom } from './load-existing-rooms';
+import { GenericTransformer } from './transformers/generic';
 import { ClaimedSubRoom, Network, Polychat, PolychatStateEventType, SubRoom, SubRoomUser, UnclaimedSubRoom } from './types';
 
 const log = logger.child({ name: 'appservice' });
@@ -102,16 +102,21 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     if (subRoomIndex === -1) {
         throw Error('E_OUT_OF_SUB_ROOMS');
     }
+    
+    const localpartInMainRoom = uniqueId('polychat_');
+    const userIntent = appservice.getIntent(localpartInMainRoom);
+    await userIntent.ensureRegistered();
+
     const subRoom = unclaimedSubRoomsForThisNetwork[subRoomIndex]!;
     unclaimedSubRoomsForThisNetwork.splice(subRoomIndex, 1);
     const claimedSubRoom: ClaimedSubRoom = {
         ...subRoom,
         timestampClaimed: new Date(),
         user: typeof userDisplayName !== 'string' ? {
-            localpartInMainRoom: uniqueId('polychat_'),
+            localpartInMainRoom,
             identity: 'inherit',
         } : {
-            localpartInMainRoom: uniqueId('polychat_'),
+            localpartInMainRoom,
             identity: 'custom',
             displayName: userDisplayName,
             avatar: '',
@@ -119,9 +124,7 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
         lastDebugState: 'Claimed room',
     };
     const intent = appservice.getIntent(registration.sender_localpart);
-    const userIntent = appservice.getIntent(claimedSubRoom.user.localpartInMainRoom);
     const subRoomIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
-    await userIntent.ensureRegistered();
     // TODO Rethink what the state key should be. It's not allowed to be an MXID.
     await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, subRoom.roomId, {
         room_id: subRoom.roomId,
@@ -994,6 +997,8 @@ async function loadExistingRooms(): Promise<void> {
         polychats: [],
         controlRooms: [],
     };
+
+    log.info('loadExistingRooms: START: Load room state of joined rooms');
     for (const intent of intents) {
         const joinedRooms = await intent.underlyingClient.getJoinedRooms();
         log.info(`loadExistingRooms: Found ${joinedRooms.length} joined rooms as ${intent.userId}`);
@@ -1025,9 +1030,17 @@ async function loadExistingRooms(): Promise<void> {
         }
     }
     log.info(`loadExistingRooms: Found ${foundRooms.polychats.length} main rooms, ${foundRooms.claimedSubRooms.length} claimed sub rooms, ${foundRooms.unclaimedSubRooms.length} unclaimed sub rooms and ${foundRooms.controlRooms.length} control rooms`);
-    log.info(`loadExistingRooms: Now starting to link polychats and claimed Sub Rooms`);
-    
-    // Link Main Rooms and Sub Rooms
+    log.info('loadExistingRooms: END: Load room state of joined rooms');
+
+    // TODO: This shouldn't be needed, but might catch a bug or failed operation.
+    log.info(`loadExistingRooms: START: Ensure all polychat accounts are registered`);
+    for (const claimedSubRoom of foundRooms.claimedSubRooms) {
+        const intent = appservice.getIntent(claimedSubRoom.polychatUserId);
+        await intent.ensureRegistered();
+    }
+    log.info(`loadExistingRooms: DONE: Ensure all polychat accounts are registered`);
+
+    log.info(`loadExistingRooms: START: Link polychats and claimed Sub Rooms`);
     for (const {participantStateEvents, polychat} of foundRooms.polychats) {
         try {
             for (const participantStateEvent of participantStateEvents) {
@@ -1047,7 +1060,9 @@ async function loadExistingRooms(): Promise<void> {
             log.error({ err, room_id: polychat.mainRoomId }, `There was an unexpected error while loading the sub rooms for Polychat ${polychat.mainRoomId}`);
         }
     }
+    log.info(`loadExistingRooms: DONE: Link polychats and claimed Sub Rooms`);
 
+    log.info(`loadExistingRooms: START: Sort unclaimed rooms by network`);
     polychats.push(...foundRooms.polychats.map(({polychat}) => polychat));
     for (const unclaimedSubRoom of foundRooms.unclaimedSubRooms) {
         const array = unclaimedSubRooms.get(unclaimedSubRoom.network);
@@ -1057,8 +1072,9 @@ async function loadExistingRooms(): Promise<void> {
         }
         array.push(unclaimedSubRoom);
     }
+    log.info(`loadExistingRooms: DONE: Sort unclaimed rooms by network`);
 
-    log.info('loadingExistingRooms: Done loading rooms');
+    log.info('loadingExistingRooms: Done');
 }
 
 async function main(): Promise<void> {
