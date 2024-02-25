@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  pcas-dev:
+    environment:
+      PATH_CONFIG: /pcas-data/config
+      PATH_DATA: /pcas-data/data
+      HOMESERVER_NAME: synapse
+      HOMESERVER_URL: http://synapse:8008
+    volumes:
+      - ./mxtest/data/pcas:/pcas-data

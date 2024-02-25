@@ -1,0 +1,5 @@
+include:
+  - ${MXTEST_SDK_ROOT}/hs/synapse.yaml
+  - path:
+      - ../compose.yaml
+      - pcas.override.yaml
