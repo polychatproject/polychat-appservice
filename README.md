@@ -80,7 +80,8 @@ Stages:
 
 ### Run from projekt root
 
-The compose files are intended to be used with mxtest, to create the required .env file run `./make-env.sh`
+The compose files are intended to be used with mxtest, to create the required .env file run `./make-env.sh`.
+If the .env already exists, the reqiured items are appended.
 
 Create file `compose.override.yaml`
 
@@ -109,6 +110,6 @@ Adjust/add settngs as needed.
 
 `./fullstack.sh`
 
-This set up a synapse and attaches the devel version to it with data from data/pcas/config and data/pcas/config
+This set up a synapse and attaches the devel version to it with data from data/pcas/config and data/pcas/data
 
 Adjust settings in pcas.override.yaml.

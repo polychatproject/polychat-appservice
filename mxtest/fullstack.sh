@@ -47,12 +47,12 @@ mxcompose exec synapse register_new_matrix_user -c /data/homeserver.yaml -u test
 mkdir -p data/pcas/config
 mkdir -p data/pcas/data
 
-# TODO generate configuration/registration
+# TODO generate configuration/registration, copy the reg from repos for now
 # ?? bun run generate_token.ts
 cp ../config/registration.yaml data/pcas/config/registration.yaml
 
 # TODO register appservice
-# ${MXTEST_SDK_ROOT}/hs/synapse/addbridge.sh  pcas-registration.yaml 
+${MXTEST_SDK_ROOT}/hs/synapse/addbridge.sh  data/pcas/config/registration.yaml pcas-registration.yaml
 
 # restart (and only) synapse 
 mxcompose restart --no-deps synapse
