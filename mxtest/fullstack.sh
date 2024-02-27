@@ -2,14 +2,18 @@
 
 set -eu
 
+# attempt to kill previous instance
+docker compose down --remove-orphans
 
-# first install mxtest ino ./mxtest
-# extract it from docker image
-image=registry.gitlab.com/mb-saces/mxtest:next
-docker pull $image
-container_id=$(docker create "$image")
-docker cp "$container_id:/mxtest" mxtest
-docker rm "$container_id"
+# first install mxtest into ./mxtest if not present
+if [ ! -d mxtest ]; then
+  # extract from docker image
+  image=registry.gitlab.com/mb-saces/mxtest:next
+  docker pull $image
+  container_id=$(docker create "$image")
+  docker cp "$container_id:/mxtest" mxtest
+  docker rm "$container_id"
+fi
 
 # install it by adding it to path
 export PATH=$(pwd)/mxtest/bin:${PATH}
@@ -47,12 +51,11 @@ mxcompose exec synapse register_new_matrix_user -c /data/homeserver.yaml -u test
 mkdir -p data/pcas/config
 mkdir -p data/pcas/data
 
-# TODO generate configuration/registration, copy the reg from repos for now
-# ?? bun run generate_token.ts
-cp ../config/registration.yaml data/pcas/config/registration.yaml
+# generate configuration/registration for pcas
+./generate-config.sh mxtest "http://pcas-dev:9999" data/pcas/config/registration.yaml
 
-# TODO register appservice
-${MXTEST_SDK_ROOT}/hs/synapse/addbridge.sh  data/pcas/config/registration.yaml pcas-registration.yaml
+# register appservice
+${MXTEST_SDK_ROOT}/hs/synapse/addbridge.sh data/pcas/config/registration.yaml pcas-registration.yaml
 
 # restart (and only) synapse 
 mxcompose restart --no-deps synapse
