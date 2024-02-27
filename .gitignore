@@ -1,9 +1,9 @@
 /node_modules
 /data
 /config
-
+.env
 /public/index.js
-
+/compose.override.yaml
 
 .idea
 /frontend/package-lock.json
