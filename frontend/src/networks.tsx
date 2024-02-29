@@ -21,6 +21,17 @@ export const networks: Record<string, Network> = {
             },
         }),
     },
+    matrix: {
+        name: 'Matrix',
+        icon: Chat,
+        theme: createTheme({
+            palette: {
+                primary: {
+                    main: '#000',
+                },
+            },
+        }),
+    },
     signal: {
         name: 'Signal',
         icon: Chat,

@@ -124,10 +124,10 @@ export async function categorizeExistingRoom(roomId: string, allStateEvents: any
                 log.warn({ room_id: roomId, state_content: roomState }, 'Ignoring existing sub room because its user.identity is not implemented');
                 return result;
             }
-            log.debug({ sub_room: subRoom, room_id: roomId }, 'Found an existing Claimed Sub Room');
+            log.debug({ sub_room: subRoom, room_id: roomId }, 'Found an existing claimed Sub Room');
             result.claimedSubRooms.push(subRoom);
         } else {
-            log.debug({ sub_room: subRoom, room_id: roomId }, 'Found an existing Unclaimed Sub Room');
+            log.debug({ sub_room: subRoom, room_id: roomId }, 'Found an existing unclaimed Sub Room');
             result.unclaimedSubRooms.push(subRoom);
         }
     // } else if (roomState.type === 'control') {

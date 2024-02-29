@@ -18,7 +18,6 @@ bun run start
 * `API_PORT` - Publicly available provisioning API for the linker frontend. Defaults to 9998.
 * `APPSERVICE_BIND_ADDRESS` - The homeserver needs to be able to reach this. Defaults to "0.0.0.0".
 * `APPSERVICE_PORT` - The homeserver needs to be able to reach this. Defaults to 9999.
-* `DEBUG_MXID` - This Matrix User ID will get an invite to every room for debugging purposes. In sub rooms, this user can impersonate the Polychat user.
 * `HOMESERVER_NAME` - The homeserver name, e.g. "matrix.org".
 * `HOMESERVER_URL` - The best URL to reach the homeserver, e.g. https://matrix-client.matrix.org.
 * `PATH_DATA` - Folder path to persist data. Makes starting up faster and prevents events from being processed twice.
@@ -38,6 +37,11 @@ bun run start
 * `WHATSAPP_BRIDGE_MXID` - The Matrix User ID of the WhatsApp bridge.
 * `WHATSAPP_BRIDGE_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs which have a linked WhatsApp account. They will be the "Polychat" account talking to WhatsApp users.
 * `WHATSAPP_BRIDGE_COMMAND_PREFIX` - How to address the WhatsApp bridge bot? Defaults to "!wa".
+
+### Debugging and testing
+* `DEBUG_MXID` - This Matrix User ID will get an invite to every room for debugging purposes. In sub rooms, this user can impersonate the Polychat user.
+* `MATRIX_NETWORK_ENABLED` - Set to "true" to enable a "Matrix" sub rooms. Defaults to false.
+* `MATRIX_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs. They will be the "Polychat" account talking to Matrix users.
 
 ### Experimental features
 * `LOAD_EXISTING_ROOMS` - Experimental!! Set to "true" to load existing rooms. Defaults to false.

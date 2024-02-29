@@ -37,6 +37,8 @@ const SUB_ROOMS_POOL_TARGET = typeof process.env.SUB_ROOMS_POOL_TARGET === 'stri
 
 const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
 const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
+const MATRIX_BRIDGE_ENABLED = process.env.MATRIX_NETWORK_ENABLED === 'true';
+const MATRIX_BRIDGE_ACCOUNT_MXIDS = typeof process.env.MATRIX_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.MATRIX_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
 const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
 const SIGNAL_BRIDGE_ACCOUNT_MXIDS = typeof process.env.SIGNAL_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.SIGNAL_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
 const SIGNAL_BRIDGE_COMMAND_PREFIX = process.env.SIGNAL_BRIDGE_COMMAND_PREFIX || '!signal';
@@ -49,6 +51,7 @@ const WHATSAPP_BRIDGE_ACCOUNT_MXIDS = typeof process.env.WHATSAPP_BRIDGE_ACCOUNT
 const WHATSAPP_BRIDGE_COMMAND_PREFIX = process.env.WHATSAPP_BRIDGE_COMMAND_PREFIX || '!wa';
 
 log.debug('IRC_BRIDGE_MXID', IRC_BRIDGE_MXID);
+log.debug('MATRIX_BRIDGE_ENABLED', MATRIX_BRIDGE_ENABLED);
 log.debug('SIGNAL_BRIDGE_MXID', SIGNAL_BRIDGE_MXID);
 log.debug('TELEGRAM_BRIDGE_MXID', TELEGRAM_BRIDGE_MXID);
 log.debug('WHATSAPP_BRIDGE_MXID', WHATSAPP_BRIDGE_MXID);
@@ -66,17 +69,17 @@ const appservice = new Appservice({
 });
 
 const polychats: Polychat[] = [];
-export const unclaimedSubRooms: Map<Network, UnclaimedSubRoom[]> = new Map([
-    ['irc', []],
-    ['signal', []],
-    ['telegram', []],
-    ['whatsapp', []],
-]);
+export const unclaimedSubRooms: Map<Network, UnclaimedSubRoom[]> = new Map(getEnabledNetworks().map(network => (
+    [network, []]
+)));
 
-export function getEnabledNetworks(): string[] {
-    const networks: string[] = [];
+export function getEnabledNetworks(): Network[] {
+    const networks: Network[] = [];
     if (IRC_BRIDGE_MXID) {
         networks.push('irc');
+    }
+    if (MATRIX_BRIDGE_ENABLED) {
+        networks.push('matrix');
     }
     if (SIGNAL_BRIDGE_MXID) {
         networks.push('signal');
@@ -377,14 +380,16 @@ const catchInviteLinks = async (roomId: string, event: any): Promise<void> => {
         return;
     }
     log.info(`catchInviteLinks: Caught invite link in sub room ${roomId}`);
-    subRoom.inviteUrl = signalInviteLink ?? telegramInviteLink ?? whatsAppInviteLink;
-    subRoom.timestampReady = new Date();
-    subRoom.lastDebugState = 'Caught invite url; room is now ready to be claimed';
+    const inviteUrl = signalInviteLink ?? telegramInviteLink ?? whatsAppInviteLink;
+    const timestampReady = new Date();
     const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
     await patchSubRoomState(intent.underlyingClient, roomId, {
-        invite_url: subRoom.inviteUrl,
-        timestamp_ready: subRoom.timestampReady.getTime(),
+        invite_url: inviteUrl,
+        timestamp_ready: timestampReady.getTime(),
     });
+    subRoom.inviteUrl = inviteUrl;
+    subRoom.timestampReady = timestampReady;
+    subRoom.lastDebugState = 'Caught invite url; room is now ready to be claimed';
 };
 
 const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void> => {
@@ -405,19 +410,7 @@ const onMessageInMainRoom = async (polychat: Polychat, event: any): Promise<void
 
 export const fillUpSubRoomPool = (): void => {
     log.debug(`Called fillUpSubRoomPool`)
-    const networks: Map<Network, string | undefined> = new Map([
-        ['irc', IRC_BRIDGE_MXID],
-        ['telegram', TELEGRAM_BRIDGE_MXID],
-        ['signal', SIGNAL_BRIDGE_MXID],
-        ['whatsapp', WHATSAPP_BRIDGE_MXID],
-    ]);
-
-    for (const [network, mxid] of networks.entries()) {
-        if (!mxid) {
-            // Network not configured
-            log.debug(`fillUpSubRoomPool: MXID for ${network} not defined`);
-            continue;
-        }
+    for (const network of getEnabledNetworks()) {
         const unclaimedSubRoomsForThisNetwork = unclaimedSubRooms.get(network);
         if (unclaimedSubRoomsForThisNetwork === undefined) {
             log.fatal(`Programming error: No array of unclaimed sub rooms for network ${network}`);
@@ -530,6 +523,55 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 room.lastDebugState = 'Failed to send "!plumb" command';
             }
         }, 15000);
+
+    } else if (opts.network === 'matrix') {
+        if (!MATRIX_BRIDGE_ENABLED) {
+            throw Error(`Network not configured: ${opts.network}`);
+        }
+        if (MATRIX_BRIDGE_ACCOUNT_MXIDS.length === 0) {
+            throw Error(`MATRIX_BRIDGE_ACCOUNT_MXIDS required to open WhatsApp sub rooms`);
+        }
+        const intent = appservice.getIntentForUserId(MATRIX_BRIDGE_ACCOUNT_MXIDS[0]!);
+        const roomId = await intent.underlyingClient.createRoom({
+            name: opts.name || 'Polychat room',
+            // TODO The "matrix" network is just for testing. Otherwise, the visibility should be "private".
+            visibility: 'public',
+            initial_state: [
+                {
+                    type: PolychatStateEventType.room,
+                    content: {
+                        type: 'sub',
+                        network: opts.network,
+                        polychat_user_id: intent.userId,
+                        timestamp_created: new Date().getTime(),
+                    },
+                },
+            ],
+        });
+        const log3 = log2.child({ room_id: roomId });
+        if (DEBUG_MXID) {
+            await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
+            await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
+        }
+
+        const room: UnclaimedSubRoom = {
+            network: opts.network,
+            polychatUserId: intent.userId,
+            roomId,
+            timestampCreated: new Date(),
+            lastDebugState: 'Created room',
+        }
+        unclaimedSubRooms.get('matrix')!.push(room);
+
+        const inviteUrl = `https://matrix.to/#/${roomId}`;
+        const timestampReady = new Date();
+        await patchSubRoomState(intent.underlyingClient, roomId, {
+            invite_url: inviteUrl,
+            timestamp_ready: timestampReady.getTime(),
+        });
+        room.inviteUrl = inviteUrl;
+        room.timestampReady = timestampReady;
+        room.lastDebugState = 'Set invite url; room is now ready to be claimed';
 
     } else if (opts.network === 'signal') {
         if (!SIGNAL_BRIDGE_MXID) {
@@ -1088,7 +1130,7 @@ async function loadExistingRooms(): Promise<void> {
     for (const unclaimedSubRoom of foundRooms.unclaimedSubRooms) {
         const array = unclaimedSubRooms.get(unclaimedSubRoom.network);
         if (!Array.isArray(array)) {
-            log.error({ room_id: unclaimedSubRoom.roomId, network: unclaimedSubRoom.network }, 'loadExistingRooms: Missing network array to store unclaimed Sub Room');
+            log.error({ room_id: unclaimedSubRoom.roomId, network: unclaimedSubRoom.network }, 'loadExistingRooms: Missing network array to store unclaimed Sub Room. Is this network configured?');
             continue;
         }
         array.push(unclaimedSubRoom);
@@ -1101,15 +1143,22 @@ async function loadExistingRooms(): Promise<void> {
 async function main(): Promise<void> {
     const intent = appservice.getIntent(registration.sender_localpart);
     await intent.ensureRegistered();
+
+    // TODO: Temporary solution so I don't have to register these manually
+    for (const mxid of MATRIX_BRIDGE_ACCOUNT_MXIDS) {
+        const intent = appservice.getIntentForUserId(mxid);
+        await intent.ensureRegistered();
+    }
     
+    if (LOAD_EXISTING_ROOMS) {
+        await loadExistingRooms();
+    }
+
     // AppService
     // Typically appservices will want to autojoin all rooms
     AutojoinRoomsMixin.setupOnAppservice(appservice);
     appservice.begin().then(async () => {
         log.info(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
-        if (LOAD_EXISTING_ROOMS) {
-            await loadExistingRooms();
-        }
         fillUpSubRoomPool();
         api.set('ready', true);
         api.set('live', true);

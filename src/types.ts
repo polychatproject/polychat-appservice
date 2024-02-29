@@ -1,4 +1,4 @@
-export type Network = 'irc' | 'signal' | 'telegram' | 'whatsapp';
+export type Network = 'irc' | 'matrix' | 'signal' | 'telegram' | 'whatsapp';
 
 export enum PolychatStateEventType {
     room = 'de.polychat.room',
