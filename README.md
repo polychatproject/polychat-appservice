@@ -72,6 +72,142 @@ There are
 
 Stages:
 
-- `unclaimed` - The room has been prepared for a specific Polychat.
-- `claimed` - The room is assigned to a user who has not joined yet. We may not know the third-party identity of the user.
-- `active` - The room is actively bridged for a specific user.
+1. created - The Matrix room has been created.
+2. ready - The room is linked to a 3rd-party network and ready to be claimed.
+3. claimed - The room is assigned to a Polychat and a user who has not joined yet. We may not know the third-party identity of the user.
+4. active - The room has been joined by a user and messages are being bridged.
+
+### State events
+
+#### Main room
+
+```json
+{
+    "type": "de.polychat.room",
+    "state_key": "",
+    "content": {
+        "type": "main"
+    }
+}
+```
+
+##### Per attached sub room
+
+```json
+{
+    "type": "de.polychat.room.participant",
+    "state_key": "!abc:localhost",
+    "content": {
+        "room_id": "!abc:locahost",
+        "user_id": "@abc:localhost"
+    }
+}
+```
+
+* Ignore the `state_key`. It's just required to be unique.
+* Use `room_id` to identify the sub room.
+* Ignore the `user_id`. It might used in the future.
+
+#### Sub Room
+
+```json
+{
+    "type": "de.polychat.room",
+    "state_key": "",
+    "content": {
+        "type": "sub",
+        "network": "telegram",
+        "polychat_user_id": "@polychat_000001:polychat.de",
+        "timestamp_created": 1708750797214,
+    }
+}
+```
+
+##### After it is ready to be claimed
+
+```json
+{
+    "type": "de.polychat.room",
+    "state_key": "",
+    "content": {
+        "type": "sub",
+        "network": "telegram",
+        "polychat_user_id": "@bridged_to_telegram_001:polychat.de",
+        "timestamp_created": 1708750797214,
+        "timestamp_ready": 1708750815712,
+        "invite_link": "https://t.me/+O_22QPKlYkswYzAy"
+    }
+}
+```
+
+##### After it has been claimed
+
+```json
+{
+    "type": "de.polychat.room",
+    "state_key": "",
+    "content": {
+        "type": "sub",
+        "network": "telegram",
+        "polychat_user_id": "@polychat_000001:polychat.de",
+        "timestamp_created": 1708750797214,
+        "timestamp_ready": 1708750815712,
+        "invite_link": "https://t.me/+O_22QPKlYkswYzAy",
+        "timestamp_claimed": 1708751064269,
+        "user": {
+            "identity": "inherit",
+            "localpart_in_main_room": "@polychat_000001:polychat.de",
+        }
+    }
+}
+```
+
+##### After a user has joined
+
+```json
+{
+    "type": "de.polychat.room",
+    "state_key": "",
+    "content": {
+        "type": "sub",
+        "network": "telegram",
+        "polychat_user_id": "@polychat_000001:polychat.de",
+        "timestamp_created": 1708750797214,
+        "timestamp_ready": 1708750815712,
+        "invite_link": "https://t.me/+O_22QPKlYkswYzAy",
+        "timestamp_claimed": 1708751064269,
+        "user": {
+            "identity": "inherit",
+            "localpart_in_main_room": "@polychat_000001:polychat.de",
+        },
+        "timestamp_joined": 1708751938226,
+        "user_id": "@telegram_01010101:polychat.de"
+    }
+}
+```
+
+##### After a user has left
+
+```json
+{
+    "type": "de.polychat.room",
+    "state_key": "",
+    "content": {
+        "type": "sub",
+        "network": "telegram",
+        "polychat_user_id": "@polychat_000001:polychat.de",
+        "timestamp_created": 1708750797214,
+        "timestamp_ready": 1708750815712,
+        "invite_link": "https://t.me/+O_22QPKlYkswYzAy",
+        "timestamp_claimed": 1708751064269,
+        "user": {
+            "identity": "inherit",
+            "localpart_in_main_room": "@polychat_000001:polychat.de",
+        },
+        "timestamp_joined": 1708751938226,
+        "user_id": "@telegram_01010101:polychat.de",
+        "timestamp_left": 1708752077566,
+    }
+}
+```
+
