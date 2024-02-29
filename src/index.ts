@@ -1044,6 +1044,7 @@ async function loadExistingRooms(): Promise<void> {
     log.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
     const intents = [
         appservice.getIntent(registration.sender_localpart),
+        ...MATRIX_BRIDGE_ACCOUNT_MXIDS.map(mxid => appservice.getIntentForUserId(mxid)),
         ...SIGNAL_BRIDGE_ACCOUNT_MXIDS.map(mxid => appservice.getIntentForUserId(mxid)),
         ...TELEGRAM_BRIDGE_ACCOUNT_MXIDS.map(mxid => appservice.getIntentForUserId(mxid)),
         ...WHATSAPP_BRIDGE_ACCOUNT_MXIDS.map(mxid => appservice.getIntentForUserId(mxid)),
