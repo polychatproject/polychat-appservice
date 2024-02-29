@@ -90,10 +90,7 @@ export function getEnabledNetworks(): string[] {
     return networks;
 }
 
-/**
- * Take a Sub Room from the pool of prepared Sub Rooms and assign it to one Polychat user and one Polychat.
- */
-export async function claimSubRoom(polychat: Polychat, network: Network, userDisplayName?: string): Promise<string> {
+export function popUnclaimedSubRoom(network: Network): UnclaimedSubRoom {
     const unclaimedSubRoomsForThisNetwork = unclaimedSubRooms.get(network);
     if (!Array.isArray(unclaimedSubRoomsForThisNetwork)) {
         throw Error('E_NO_SUB_ROOM_FOR_THIS_NETWORK');
@@ -102,13 +99,21 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     if (subRoomIndex === -1) {
         throw Error('E_OUT_OF_SUB_ROOMS');
     }
-    
-    const localpartInMainRoom = uniqueId('polychat_');
-    const userIntent = appservice.getIntent(localpartInMainRoom);
-    await userIntent.ensureRegistered();
+    const [subRoom] = unclaimedSubRoomsForThisNetwork.splice(subRoomIndex, 1);
+    if (!subRoom) {
+        log.error({ network, sub_room_index: subRoomIndex }, 'Coding error: An unclaimed sub room we had previously selected disappeared.');
+        throw Error('E_OUT_OF_SUB_ROOMS');
+    }
+    return subRoom;
+}
 
-    const subRoom = unclaimedSubRoomsForThisNetwork[subRoomIndex]!;
-    unclaimedSubRoomsForThisNetwork.splice(subRoomIndex, 1);
+/**
+ * Take a Sub Room from the pool of prepared Sub Rooms and assign it to one Polychat user and one Polychat.
+ */
+export async function claimSubRoom(polychat: Polychat, network: Network, userDisplayName?: string): Promise<string> {
+    const subRoom = popUnclaimedSubRoom(network);
+
+    const localpartInMainRoom = uniqueId('polychat_');
     const claimedSubRoom: ClaimedSubRoom = {
         ...subRoom,
         timestampClaimed: new Date(),
@@ -125,14 +130,8 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
     };
     const intent = appservice.getIntent(registration.sender_localpart);
     const subRoomIntent = appservice.getIntentForUserId(subRoom.polychatUserId);
-    // TODO Rethink what the state key should be. It's not allowed to be an MXID.
-    await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, subRoom.roomId, {
-        room_id: subRoom.roomId,
-        user_id: userIntent.userId,
-    });
-    await subRoomIntent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', {
-        name: polychat.name,
-    });
+    const userIntent = appservice.getIntent(localpartInMainRoom);
+
     await patchSubRoomState(subRoomIntent.underlyingClient, subRoom.roomId, {
         timestamp_claimed: claimedSubRoom.timestampClaimed.getTime(),
         user: claimedSubRoom.user.identity === 'inherit' ? {
@@ -145,6 +144,20 @@ export async function claimSubRoom(polychat: Polychat, network: Network, userDis
             avatar: claimedSubRoom.user.avatar,
         },
     });
+
+    await userIntent.ensureRegistered();
+
+    // TODO Rethink what the state key should be. It's not allowed to be an MXID.
+    await intent.underlyingClient.sendStateEvent(polychat.mainRoomId, PolychatStateEventType.participant, subRoom.roomId, {
+        room_id: subRoom.roomId,
+        user_id: userIntent.userId,
+    });
+
+
+    await subRoomIntent.underlyingClient.sendStateEvent(subRoom.roomId, 'm.room.name', '', {
+        name: polychat.name,
+    });
+
     polychat.subRooms.push(claimedSubRoom);
     
     // Refill the Sub Room Pool
@@ -981,6 +994,9 @@ async function safelyGetRoomStateEvent(client: MatrixClient, roomId: string, typ
     }
 }
 
+/**
+ * After polychat-appservice has been restarted, we iterate through joined rooms to restore the bridge.
+ */
 async function loadExistingRooms(): Promise<void> {
     log.debug('Called loadExistingRooms');
     log.warn('loadExistingRooms DOES NOT PROPERLY WORK YET');
