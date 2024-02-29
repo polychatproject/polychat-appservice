@@ -56,7 +56,11 @@ export async function categorizeExistingRoom(roomId: string, allStateEvents: any
         });
     } else if (roomState.type === 'sub') {
         if (!('timestamp_ready' in roomState) || typeof roomState.timestamp_ready !== 'number') {
-            log.warn({ room_id: roomId, state_content: roomState }, 'Ignoring existing sub room, because it is not ready. We should delete the room.');
+            log.warn({ room_id: roomId, state_content: roomState }, 'Ignoring existing sub room because it is not ready. We should delete the room.');
+            return result;
+        }
+        if (!('invite_url' in roomState) || typeof roomState.invite_url !== 'string') {
+            log.warn({ room_id: roomId, state_content: roomState }, 'Ignoring existing sub room because it has no invite_url. We should delete the room.');
             return result;
         }
         if (!('network' in roomState) || typeof roomState.network !== 'string') {
@@ -73,7 +77,7 @@ export async function categorizeExistingRoom(roomId: string, allStateEvents: any
             return result;
         }
         if (!('timestamp_created' in roomState) || typeof roomState.timestamp_created !== 'number') {
-            log.warn({ room_id: roomId, state_content: roomState }, 'Ignoring existing sub room because its polychat_user_id is invalid');
+            log.warn({ room_id: roomId, state_content: roomState }, 'Ignoring existing sub room because its timestamp_created is invalid');
             return result;
         }
         const subRoom: SubRoom = {
