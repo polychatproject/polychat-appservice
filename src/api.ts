@@ -216,7 +216,7 @@ api.get('/index.js', async (req, res) => {
     if (API_JOIN_BASE_URL !== 'https://join.polychat.de') {
         text = text.replace(/https:\/\/join\.polychat\.de/g, API_JOIN_BASE_URL);
     }
-    res.type('html').end(text);
+    res.type('js').end(text);
 });
 
 api.use(express.static('./public'));
