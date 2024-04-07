@@ -18,7 +18,7 @@ router.get('/polychats', async (req, res) => {
     });
 });
 
-router.get('/shut-down-polychat/:polychatId', async (req, res) => {
+router.post('/shut-down-polychat/:polychatId', async (req, res) => {
     const polychat = findMainRoom(req.params.polychatId.normalize());
     if (!polychat) {
         res.status(403).json({
