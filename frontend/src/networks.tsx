@@ -1,5 +1,5 @@
 import { Chat, Telegram, WhatsApp } from '@mui/icons-material';
-import { Theme, createTheme } from '@mui/material';
+import { Theme, createTheme } from '@mui/material/styles';
 import { OverridableComponent } from '@mui/material/OverridableComponent';
 import { SvgIconTypeMap } from '@mui/material/SvgIcon/SvgIcon';
 
