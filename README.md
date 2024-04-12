@@ -40,8 +40,8 @@ bun run start
 
 ### Debugging and testing
 * `DEBUG_MXID` - This Matrix User ID will get an invite to every room for debugging purposes. In sub rooms, this user can impersonate the Polychat user.
-* `MATRIX_NETWORK_ENABLED` - Set to "true" to enable a "Matrix" sub rooms. Defaults to false.
-* `MATRIX_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs. They will be the "Polychat" account talking to Matrix users.
+* `MATRIX_BRIDGE_ENABLED` - Set to "true" to enable a "Matrix" sub rooms. Defaults to false.
+* `MATRIX_BRIDGE_ACCOUNT_MXIDS` - A comma-separated list of Matrix User IDs. They will be the "Polychat" account talking to Matrix users.
 
 ### Experimental features
 * `LOAD_EXISTING_ROOMS` - Experimental!! Set to "true" to load existing rooms. Defaults to false.

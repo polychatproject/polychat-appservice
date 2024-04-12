@@ -5,6 +5,8 @@ import multer from 'multer';
 import { PATH_DATA } from '../env';
 import { logger } from '../logger';
 import { findMainRoom } from '..';
+import api202401 from './2024-01';
+import api202401debug from './2024-01-debug';
 
 const log = logger.child({ name: 'api' });
 
@@ -29,8 +31,8 @@ const allowCrossDomain = function (req: any, res: any, next: any) {
 
 // api.use('/api/', express.static(PATH_UPLOADS));
 
-api.use('/api/2024-01', allowCrossDomain);
-api.use('/api/2024-01-debug', allowCrossDomain);
+api.use('/api/2024-01', allowCrossDomain, api202401);
+api.use('/api/2024-01-debug', allowCrossDomain, api202401debug);
 
 /* START METRICS AND KUBERNETES */
 

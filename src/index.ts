@@ -37,7 +37,7 @@ const SUB_ROOMS_POOL_TARGET = typeof process.env.SUB_ROOMS_POOL_TARGET === 'stri
 
 const IRC_BRIDGE_MXID = process.env.IRC_BRIDGE_MXID;
 const IRC_BRIDGE_SERVER = process.env.IRC_BRIDGE_SERVER;
-const MATRIX_BRIDGE_ENABLED = process.env.MATRIX_NETWORK_ENABLED === 'true';
+const MATRIX_BRIDGE_ENABLED = process.env.MATRIX_BRIDGE_ENABLED === 'true';
 const MATRIX_BRIDGE_ACCOUNT_MXIDS = typeof process.env.MATRIX_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.MATRIX_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
 const SIGNAL_BRIDGE_MXID = process.env.SIGNAL_BRIDGE_MXID;
 const SIGNAL_BRIDGE_ACCOUNT_MXIDS = typeof process.env.SIGNAL_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.SIGNAL_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
@@ -50,11 +50,11 @@ const WHATSAPP_BRIDGE_MXID = process.env.WHATSAPP_BRIDGE_MXID;
 const WHATSAPP_BRIDGE_ACCOUNT_MXIDS = typeof process.env.WHATSAPP_BRIDGE_ACCOUNT_MXIDS === 'string' ? process.env.WHATSAPP_BRIDGE_ACCOUNT_MXIDS.split(',') : [];
 const WHATSAPP_BRIDGE_COMMAND_PREFIX = process.env.WHATSAPP_BRIDGE_COMMAND_PREFIX || '!wa';
 
-log.debug('IRC_BRIDGE_MXID', IRC_BRIDGE_MXID);
-log.debug('MATRIX_BRIDGE_ENABLED', MATRIX_BRIDGE_ENABLED);
-log.debug('SIGNAL_BRIDGE_MXID', SIGNAL_BRIDGE_MXID);
-log.debug('TELEGRAM_BRIDGE_MXID', TELEGRAM_BRIDGE_MXID);
-log.debug('WHATSAPP_BRIDGE_MXID', WHATSAPP_BRIDGE_MXID);
+log.debug(`IRC_BRIDGE_MXID ${IRC_BRIDGE_MXID}`);
+log.debug(`MATRIX_BRIDGE_ENABLED ${MATRIX_BRIDGE_ENABLED}`);
+log.debug(`SIGNAL_BRIDGE_MXID ${SIGNAL_BRIDGE_MXID}`);
+log.debug(`TELEGRAM_BRIDGE_MXID ${TELEGRAM_BRIDGE_MXID}`);
+log.debug(`WHATSAPP_BRIDGE_MXID ${WHATSAPP_BRIDGE_MXID}`);
 
 const registration: IAppserviceRegistration = parseYAML(fs.readFileSync(path.join(PATH_CONFIG, 'registration.yaml'), 'utf8'));
 

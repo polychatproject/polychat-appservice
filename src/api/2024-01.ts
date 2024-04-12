@@ -10,13 +10,13 @@ const API_JOIN_BASE_URL = process.env.API_JOIN_BASE_URL || 'https://join.polycha
 
 const upload = multer({ dest: PATH_UPLOADS });
 
-const log = logger.child({ name: 'api/2024-01-debug' });
+const log = logger.child({ name: 'api/2024-01' });
 const router = Router();
 
 /**
  * Create a new Polychat.
  */
-router.get('/api/2024-01/settings', async (req, res) => {
+router.get('/settings', async (req, res) => {
     res.json({
         networks: getEnabledNetworks(),
     });
@@ -25,7 +25,7 @@ router.get('/api/2024-01/settings', async (req, res) => {
 /**
  * Create a new Polychat.
  */
-router.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) => {
+router.post('/polychat', upload.single('avatar'), async (req, res) => {
     if (typeof req.body.name !== 'string') {
         res.status(403).json({
             errcode: 'E_NAME_MISSING',
@@ -58,7 +58,7 @@ router.post('/api/2024-01/polychat', upload.single('avatar'), async (req, res) =
 /**
  * Get the info of a polychat.
  */
-router.get('/api/2024-01/polychat/:polychatId', (req, res) => {
+router.get('/polychat/:polychatId', (req, res) => {
     const polychat = findMainRoom(req.params.polychatId.normalize());
     log.info(`API: Requested Polychat ${req.params.polychatId}`);
     if (!polychat) {
@@ -78,7 +78,7 @@ router.get('/api/2024-01/polychat/:polychatId', (req, res) => {
 /**
  * Get an invite link for a bridged polychat.
  */
-router.post('/api/2024-01/polychat/:polychatId/:networkId', upload.single('avatar'), async (req, res) => {
+router.post('/polychat/:polychatId/:networkId', upload.single('avatar'), async (req, res) => {
     const mainRoomId = req.params.polychatId ?? '';
     const networkId = req.params.networkId ?? '';
 
@@ -126,3 +126,5 @@ router.post('/api/2024-01/polychat/:polychatId/:networkId', upload.single('avata
         return;
     }
 });
+
+export default router;

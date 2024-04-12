@@ -39,3 +39,5 @@ router.post('/shut-down-polychat/:polychatId', async (req, res) => {
         });
     }
 });
+
+export default router;
