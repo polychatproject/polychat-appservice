@@ -11,19 +11,19 @@
     "bun-types": "latest"
   },
   "peerDependencies": {
-    "typescript": "^5.4.4"
+    "typescript": "5.2.2"
   },
   "dependencies": {
-    "@emotion/react": "^11.11.4",
-    "@emotion/styled": "^11.11.5",
+    "@emotion/react": "11.11.3",
+    "@emotion/styled": "11.11.0",
     "@happy-dom/global-registrator": "^14.7.0",
-    "@mui/icons-material": "^5.15.15",
-    "@mui/material": "^5.15.15",
+    "@mui/icons-material": "5.15.10",
+    "@mui/material": "5.15.10",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.2.2",
     "@testing-library/user-event": "^14.5.2",
     "@types/qrcode": "^1.5.5",
-    "@types/react-dom": "^18.2.24",
+    "@types/react-dom": "18.2.19",
     "msw": "^2.2.13",
     "qrcode": "^1.5.3",
     "react": "^18.2.0",
