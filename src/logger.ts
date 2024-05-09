@@ -66,4 +66,3 @@ if (!fileExists) {
     const log = logger.child({name: 'logger'});
     log.info('pino.json does not exist. Use it to configure the logger. See https://getpino.io/#/docs/api?id=options');
 }
-
