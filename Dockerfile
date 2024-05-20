@@ -13,13 +13,11 @@ WORKDIR "/app/frontend"
 RUN bun install --frozen-lockfile
 RUN bun build.ts
 
+
+
 FROM oven/bun:1
 
-ENV NODE_ENV production
-ENV PATH_CONFIG /config
-ENV PATH_DATA /data
-ENV HOMESERVER_NAME synapse
-ENV HOMESERVER_URL http://synapse:8008
+ENV NODE_ENV=production PATH_CONFIG=/config PATH_DATA=/data HOMESERVER_NAME=synapse HOMESERVER_URL=http://synapse:8008
 
 WORKDIR "/app"
 
