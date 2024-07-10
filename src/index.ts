@@ -627,14 +627,14 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 log3.info(`Sent "create group" to ${roomId}`);
                 // TODO: Wait for success, then get invite link
                 setTimeout(async () => {
-                    log3.info(`Send "invite-link" to ${roomId}`);
+                    log3.info(`Send "reset-invite-link" to ${roomId}`);
                     try {
-                        await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} invite-link`);
-                        room.lastDebugState = 'Sent "invite-link" command';
-                        log3.info(`Sent "invite-link" to ${roomId}`);
+                        await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} reset-invite-link`);
+                        room.lastDebugState = 'Sent "reset-invite-link" command';
+                        log3.info(`Sent "reset-invite-link" to ${roomId}`);
                     } catch (err) {
-                        log3.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
-                        room.lastDebugState = 'Failed to send "invite-link" command';
+                        log3.warn({ err }, `Failed to send "reset-invite-link" request to ${roomId}`);
+                        room.lastDebugState = 'Failed to send "reset-invite-link" command';
                     }
                 }, 15000);
             } catch (err) {
