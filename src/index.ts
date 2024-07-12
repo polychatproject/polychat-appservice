@@ -279,26 +279,6 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
         return;
     }
 
-    // TODO: Move command to control rooms
-    const claimRegExp = /^claim (?<polychatId>[a-z]+?) (?<network>[a-z]+?)$/;
-    const body = event.content.body as string;
-    const match = body.match(claimRegExp);
-    if (match) {
-        const polychat = findMainRoom(match.groups!['polychatId']!);
-        if (!polychat) {
-            await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, `Could not find Polychat. Command: claim <polychat> <network>`);
-            return;
-        }
-        try {
-            const network = match.groups!['network'] as Network; // TODO: unsafe type cast
-            const url = await claimSubRoom(polychat, network);
-            await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, `Invite Url: ${url}`);
-        } catch (error: any) {
-            await polychatIntent.underlyingClient.replyText(subRoom.roomId, event.event_id, `error ${error.message}`);
-        }
-        return;
-    }
-
     // commands
     if (event.content.body === '!members') {
         const joinedMembers = await polychatIntent.underlyingClient.getJoinedRoomMembersWithProfiles(polychat.mainRoomId);
@@ -627,14 +607,14 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 log3.info(`Sent "create group" to ${roomId}`);
                 // TODO: Wait for success, then get invite link
                 setTimeout(async () => {
-                    log3.info(`Send "invite-link" to ${roomId}`);
+                    log3.info(`Send "reset-invite-link" to ${roomId}`);
                     try {
-                        await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} invite-link`);
-                        room.lastDebugState = 'Sent "invite-link" command';
-                        log3.info(`Sent "invite-link" to ${roomId}`);
+                        await intent.underlyingClient.sendText(roomId, `${SIGNAL_BRIDGE_COMMAND_PREFIX} reset-invite-link`);
+                        room.lastDebugState = 'Sent "reset-invite-link" command';
+                        log3.info(`Sent "reset-invite-link" to ${roomId}`);
                     } catch (err) {
-                        log3.warn({ err }, `Failed to send "invite-link" request to ${roomId}`);
-                        room.lastDebugState = 'Failed to send "invite-link" command';
+                        log3.warn({ err }, `Failed to send "reset-invite-link" request to ${roomId}`);
+                        room.lastDebugState = 'Failed to send "reset-invite-link" command';
                     }
                 }, 15000);
             } catch (err) {
@@ -801,8 +781,46 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
     }
 }
 
+const onCreatePolyChatMessageInControlRoom = async (roomId: string, event: any, match: RegExpMatchArray): Promise<void> => {
+    const polychatIntent = appservice.getIntent(registration.sender_localpart);
+    const roomName = match.groups!['name']!;
+    try {
+        const polychat = await createPolychat({ name: roomName });
+        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `created ${polychat.mainRoomId}`);
+    } catch (err: any) {
+        log.error({
+            err,
+            requested_room_name: roomName,
+            sender: event.sender,
+        }, `Failed to create a Polychat in response to a users in-chat request.`);
+        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${err.message}`);
+    }
+    return;
+};
+
+const onClaimPolyChatMessageInControlRoom = async (roomId: string, event: any, match: RegExpMatchArray): Promise<void> => {
+    const polychatIntent = appservice.getIntent(registration.sender_localpart);
+    const polychat = findMainRoom(match.groups!['polychatId']!);
+    if (!polychat) {
+        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `Could not find Polychat. Command: claim <polychat> <network>`);
+        return;
+    }
+    try {
+        const network = match.groups!['network'] as Network; // TODO: unsafe type cast
+        const url = await claimSubRoom(polychat, network);
+        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `Invite Url: ${url}`);
+    } catch (error: any) {
+        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${error.message}`);
+    }
+    return;
+};
+
 const onMessageInControlRoom = async (roomId: string, event: any): Promise<void> => {
-    const handOutRegExp = /^create polychat (?<name>.+)$/;
+    const routes: [RegExp, (roomId: string, event: any, match: RegExpMatchArray) => Promise<void>][] = [
+        [/^create polychat (?<name>.+)$/, onCreatePolyChatMessageInControlRoom],
+        [/^claim (?<polychatId>[a-z]+?) (?<network>[a-z]+?)$/, onClaimPolyChatMessageInControlRoom],
+    ];
+
     const polychatIntent = appservice.getIntent(registration.sender_localpart);
     if (typeof event.content.body !== 'string') {
         try {
@@ -811,21 +829,12 @@ const onMessageInControlRoom = async (roomId: string, event: any): Promise<void>
         return;
     }
     const body = event.content.body as string;
-    const match = body.match(handOutRegExp);
-    if (match) {
-        const roomName = match.groups!['name']!;
-        try {
-            const polychat = await createPolychat({ name: roomName });
-            await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `created ${polychat.mainRoomId}`);
-        } catch (err: any) {
-            log.error({
-                err,
-                requested_room_name: roomName,
-                sender: event.sender,
-            }, `Failed to create a Polychat in response to a users in-chat request.`);
-            await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${err.message}`);
+    for (const route of routes) {
+        const match = body.match(route[0]);
+        if (match) {
+            route[1](roomId, event, match);
+            return;
         }
-        return;
     }
 }
 
