@@ -781,7 +781,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
     }
 }
 
-const onCreatePolyChatMessageInControlRoom = async (roomId: string, event: any, match: RegExpMatchArray): Promise<void> => {
+const onCreatePolychatMessageInControlRoom = async (roomId: string, event: any, match: RegExpMatchArray): Promise<void> => {
     const polychatIntent = appservice.getIntent(registration.sender_localpart);
     const roomName = match.groups!['name']!;
     try {
@@ -795,10 +795,9 @@ const onCreatePolyChatMessageInControlRoom = async (roomId: string, event: any, 
         }, `Failed to create a Polychat in response to a users in-chat request.`);
         await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${err.message}`);
     }
-    return;
 };
 
-const onClaimPolyChatMessageInControlRoom = async (roomId: string, event: any, match: RegExpMatchArray): Promise<void> => {
+const onClaimPolychatMessageInControlRoom = async (roomId: string, event: any, match: RegExpMatchArray): Promise<void> => {
     const polychatIntent = appservice.getIntent(registration.sender_localpart);
     const polychat = findMainRoom(match.groups!['polychatId']!);
     if (!polychat) {
@@ -812,13 +811,18 @@ const onClaimPolyChatMessageInControlRoom = async (roomId: string, event: any, m
     } catch (error: any) {
         await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${error.message}`);
     }
-    return;
+};
+
+const onVersionMessageInControlRoom = async (roomId: string, event: any, match: RegExpMatchArray): Promise<void> => {
+    const polychatIntent = appservice.getIntent(registration.sender_localpart);
+    await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `Polychat version ${process.env.VERSION_NAME} (${process.env.VERSION_HASH})`);
 };
 
 const onMessageInControlRoom = async (roomId: string, event: any): Promise<void> => {
     const routes: [RegExp, (roomId: string, event: any, match: RegExpMatchArray) => Promise<void>][] = [
-        [/^create polychat (?<name>.+)$/, onCreatePolyChatMessageInControlRoom],
-        [/^claim (?<polychatId>[a-z]+?) (?<network>[a-z]+?)$/, onClaimPolyChatMessageInControlRoom],
+        [/^create polychat (?<name>.+)$/, onCreatePolychatMessageInControlRoom],
+        [/^claim (?<polychatId>[a-z]+?) (?<network>[a-z]+?)$/, onClaimPolychatMessageInControlRoom],
+        [/^version$/, onVersionMessageInControlRoom],
     ];
 
     const polychatIntent = appservice.getIntent(registration.sender_localpart);
