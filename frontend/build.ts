@@ -1,3 +1,7 @@
+console.log('POLYCHAT_PROVISIONING_API', Bun.env.POLYCHAT_PROVISIONING_API);
+console.log('VERSION_HASH', Bun.env.VERSION_HASH);
+console.log('VERSION_NAME', Bun.env.VERSION_NAME);
+
 await Bun.build({
     entrypoints: ['./src/index.tsx'],
     outdir: Bun.env.PATH_OUTPUT ?? '../public',
