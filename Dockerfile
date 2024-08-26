@@ -6,6 +6,10 @@ COPY . /app/
 RUN npm ci
 
 FROM oven/bun:1 AS build-frontend
+ARG VERSION_HASH=local
+ARG VERSION_NAME=local
+ARG VERSION_CREATOR=local
+
 # Build frontend
 WORKDIR "/app"
 COPY . /app/
