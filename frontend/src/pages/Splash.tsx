@@ -5,6 +5,7 @@ import {
     Link,
     Typography,
 } from '@mui/material';
+import { VersionInfo } from '../components/VersionInfo';
 
 export function Splash(props: { }) {
     return (
@@ -34,6 +35,8 @@ export function Splash(props: { }) {
             <p>
                 <Link href="https://polychat.de">What is Polychat?</Link>
             </p>
+
+            <VersionInfo />
         </Container>
     );
 }

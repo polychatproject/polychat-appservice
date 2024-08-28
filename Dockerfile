@@ -6,6 +6,10 @@ COPY . /app/
 RUN npm ci
 
 FROM oven/bun:1 AS build-frontend
+ARG VERSION_HASH=local
+ARG VERSION_NAME=local
+ARG VERSION_CREATOR=local
+
 # Build frontend
 WORKDIR "/app"
 COPY . /app/
@@ -13,13 +17,17 @@ WORKDIR "/app/frontend"
 RUN bun install --frozen-lockfile
 RUN bun build.ts
 
+
+
 FROM oven/bun:1
 
-ENV NODE_ENV production
-ENV PATH_CONFIG /config
-ENV PATH_DATA /data
-ENV HOMESERVER_NAME synapse
-ENV HOMESERVER_URL http://synapse:8008
+
+ARG VERSION_HASH=local
+ARG VERSION_NAME=local
+ARG VERSION_CREATOR=local
+
+ENV VERSION_HASH="${VERSION_HASH}" VERSION_NAME="${VERSION_NAME}" VERSION_CREATOR="${VERSION_CREATOR}"
+ENV NODE_ENV=production PATH_CONFIG=/config PATH_DATA=/data HOMESERVER_NAME=synapse HOMESERVER_URL=http://synapse:8008
 
 WORKDIR "/app"
 
