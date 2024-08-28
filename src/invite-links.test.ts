@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { extractTelegramInviteLink } from "./invite-links";
 
-describe('extractWhatsAppInviteLink', () => {
+describe('extractTelegramInviteLink', () => {
     test('finds a link', () => {
         const event = {
             type: "m.room.message",
