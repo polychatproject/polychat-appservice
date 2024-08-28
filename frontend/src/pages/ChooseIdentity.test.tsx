@@ -20,7 +20,7 @@ beforeAll(() => server.listen());
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
-test('loads and displays greeting', () => {
+test('loads', () => {
     const { unmount } = render(<ChooseIdentity isAdmin={false} polychatId='test' networkId='matrix' />);
     unmount();
 })

@@ -4,7 +4,7 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "scripts": {
-    "build": "bun run build.ts",
+    "build": "NODE_ENV=production bun run build.ts",
     "watch": "bun build src/index.tsx --watch --outdir ../public"
   },
   "devDependencies": {

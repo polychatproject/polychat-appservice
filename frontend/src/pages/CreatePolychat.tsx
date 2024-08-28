@@ -1,4 +1,4 @@
-import React, { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react';
+import React, { ChangeEvent, ChangeEventHandler, FormEvent, MouseEventHandler, useCallback, useEffect, useState } from 'react';
 import {
     Avatar,
     Button,
@@ -93,30 +93,34 @@ export function CreatePolychat(props: { }) {
         setReadableAddress(event.target.value);
     }, []);
 
+    const handleFileClick: MouseEventHandler<HTMLInputElement> = useCallback((event) => {
+        event.preventDefault();
+        alert('Avatar uploads are not implemented yet.');
+    }, []);
+
+    const handleGroupNameChange: ChangeEventHandler<HTMLInputElement> = useCallback(event => setGroupName(event.target.value), []);
+
     return (
         <form onSubmit={handleSubmit}>
             <ListItem>
-                <ListItemAvatar>
+                {Bun.env.UNSTABLE_FEATURES && <ListItemAvatar>
                     <Avatar>
                         <FileUpload />
                         <input
                             accept="image/png, image/jpeg"
                             type="file"
                             onChange={handleFileChange}
-                            onClick={event => {
-                                event.preventDefault();
-                                alert('Avatar uploads are not implemented yet.');
-                            }}
+                            onClick={handleFileClick}
                         />
                     </Avatar>
-                </ListItemAvatar>
+                </ListItemAvatar>}
                 <TextField
                     required
                     fullWidth
                     label="Group Name"
                     variant="standard"
                     value={groupName}
-                    onChange={useCallback(event => setGroupName(event.target.value), [])}
+                    onChange={handleGroupNameChange}
                 />
             </ListItem>
 
