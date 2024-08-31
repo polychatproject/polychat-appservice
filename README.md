@@ -86,8 +86,6 @@ If the .env already exists, the reqiured items are appended.
 Create file `compose.override.yaml`
 
 ```yaml
-version: '3.8'
-
 services:
   pcas-dev:
     ports:
