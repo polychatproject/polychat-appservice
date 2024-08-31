@@ -972,33 +972,33 @@ const onEvent = async (roomId: string, event: any): Promise<void> => {
         }
 
         // Main room: Member joined or left
-        const polychat = findMainRoom(roomId);
-        if (polychat) {
-            const polychatIntent = appservice.getIntent(registration.sender_localpart);
-            if (event.sender === polychatIntent.userId || (DEBUG_MXID && event.sender === DEBUG_MXID)) {
-                // Ignore system users
-                return;
-            }
-            let msg = '';
-            // TODO: Find display name of user
-            if (event.content.membership === 'join') {
-                msg = `${mxid} joined.`;
-            }
-            if (event.content.membership === 'leave') {
-                msg = `${mxid} left.`;
-            }
-            if (event.content.membership === 'ban') {
-                msg = `${mxid} got banned.`;
-            }
-            if (!msg) {
-                return;
-            }
-            log.info(`Main room: membership of ${mxid} changed to ${event.content.membership}`);
-            for (const subRoom of polychat.subRooms) {
-                const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
-                await intent.underlyingClient.sendNotice(subRoom.roomId, msg);
-            }
-        }
+        // const polychat = findMainRoom(roomId);
+        // if (polychat) {
+        //     const polychatIntent = appservice.getIntent(registration.sender_localpart);
+        //     if (event.sender === polychatIntent.userId || (DEBUG_MXID && event.sender === DEBUG_MXID)) {
+        //         // Ignore system users
+        //         return;
+        //     }
+        //     let msg = '';
+        //     // TODO: Find display name of user
+        //     if (event.content.membership === 'join') {
+        //         msg = `${mxid} joined.`;
+        //     }
+        //     if (event.content.membership === 'leave') {
+        //         msg = `${mxid} left.`;
+        //     }
+        //     if (event.content.membership === 'ban') {
+        //         msg = `${mxid} got banned.`;
+        //     }
+        //     if (!msg) {
+        //         return;
+        //     }
+        //     log.info(`Main room: membership of ${mxid} changed to ${event.content.membership}`);
+        //     for (const subRoom of polychat.subRooms) {
+        //         const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
+        //         await intent.underlyingClient.sendNotice(subRoom.roomId, msg);
+        //     }
+        // }
     }
 
     // Sync room name to sub rooms
