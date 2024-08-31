@@ -12,11 +12,11 @@ export function ShareButton(props: { url: string }) {
             url: props.url,
         };
         try {
-            if ('canShare' in navigator && navigator.canShare(shareData)) {
+            if ('canShare' in navigator && typeof navigator.canShare === 'function' && navigator.canShare(shareData) && 'share' in navigator && typeof navigator.share === 'function') {
                 // Web Share API is supported
                 navigator.share(shareData).then(() => {
                     console.log('Thanks for sharing!');
-                }).catch((error) => {
+                }).catch((error: unknown) => {
                     console.error(error);
                     console.warn('Failed to use WebShare API. Opening the modal instead.');
                     setIsModalOpen(true);
