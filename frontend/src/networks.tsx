@@ -1,5 +1,5 @@
 import { Chat, Telegram, WhatsApp } from '@mui/icons-material';
-import { Theme, createTheme } from '@mui/material';
+import { Theme, createTheme } from '@mui/material/styles';
 import { OverridableComponent } from '@mui/material/OverridableComponent';
 import { SvgIconTypeMap } from '@mui/material/SvgIcon/SvgIcon';
 
@@ -17,6 +17,17 @@ export const networks: Record<string, Network> = {
             palette: {
                 primary: {
                     main: '#00f',
+                },
+            },
+        }),
+    },
+    matrix: {
+        name: 'Matrix',
+        icon: Chat,
+        theme: createTheme({
+            palette: {
+                primary: {
+                    main: '#000',
                 },
             },
         }),

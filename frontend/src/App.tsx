@@ -9,7 +9,7 @@ import {
     Typography,
 } from '@mui/material';
 import { ArrowBack } from '@mui/icons-material';
-import { ThemeProvider, createTheme } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { ShareButton } from './components/ShareButton';
 import { CreatePolychat } from './pages/CreatePolychat';
 import { ChooseMessenger } from './pages/ChooseMessenger';
@@ -41,10 +41,11 @@ const BackButton = (props: { href: string }) => (
     </IconButton>
 );
 
-export function App(props: { }) {
+export function App() {
     const [pageParts, setPageParts] = useState<string[]>(location.hash.slice(1).split('/'));
     const polychatId = pageParts[1] ?? location.pathname.slice(1);
     const page = (pageParts[0] === '' && polychatId) ? 'joinMessenger' : pageParts[0];
+    const networkId = pageParts[2];
     console.log('polychatId', pageParts[1], location.pathname.slice(1));
     const [loading, error, polychatData] = usePolychatData(polychatId);
 
@@ -112,7 +113,7 @@ export function App(props: { }) {
                     <ChooseMessenger polychatId={polychatId} isAdmin={false} />
                 )}
                 {page === 'joinIdentity' && (
-                    <ChooseIdentity polychatId={polychatId} networkId={pageParts[2]} isAdmin={false} />
+                    <ChooseIdentity polychatId={polychatId} networkId={networkId} isAdmin={false} />
                 )}
                 {page === 'admin' && (
                     <ChooseMessenger polychatId={polychatId} isAdmin />

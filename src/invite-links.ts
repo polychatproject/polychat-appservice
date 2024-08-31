@@ -10,7 +10,7 @@ export const extractSignalInviteLink = (event: any, bridgeBotMxid: string): stri
     const body = event.content.body as unknown;
     // TODO Verify that the bridge uses this text to start an invitation link response.
     // This was taken from the Telegram bridge.
-    if (typeof body !== 'string' || !body.startsWith('Invite link to ')) {
+    if (typeof body !== 'string' || !body.startsWith('https://signal.group/')) {
         return;
     }
     if (event.sender !== bridgeBotMxid) {
