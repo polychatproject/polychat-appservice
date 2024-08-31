@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   pcas-npm-install:
     image: docker.io/library/node:21
