@@ -995,6 +995,10 @@ const onEvent = async (roomId: string, event: any): Promise<void> => {
         //     }
         //     log.info(`Main room: membership of ${mxid} changed to ${event.content.membership}`);
         //     for (const subRoom of polychat.subRooms) {
+        //         if (mxid === subRoom.userId) {
+        //             // Don't send users their own membership updates
+        //             continue;
+        //         }
         //         const intent = appservice.getIntentForUserId(subRoom.polychatUserId);
         //         await intent.underlyingClient.sendNotice(subRoom.roomId, msg);
         //     }
