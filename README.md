@@ -76,6 +76,10 @@ There are
 
 Stages:
 
+- `unclaimed` - The room has been prepared for a specific Polychat.
+- `claimed` - The room is assigned to a user who has not joined yet. We may not know the third-party identity of the user.
+- `active` - The room is actively bridged for a specific user.
+
 1. created - The Matrix room has been created.
 2. ready - The room is linked to a 3rd-party network and ready to be claimed.
 3. claimed - The room is assigned to a Polychat and a user who has not joined yet. We may not know the third-party identity of the user.
@@ -215,3 +219,38 @@ Stages:
 }
 ```
 
+## Development & Compose
+
+### Run from projekt root
+
+The compose files are intended to be used with mxtest, to create the required .env file run `./make-env.sh`.
+If the .env already exists, the reqiured items are appended.
+
+Create file `compose.override.yaml`
+
+```yaml
+services:
+  pcas-dev:
+    ports:
+      - "9998:9998"
+      - "9999:9999"
+    environment:
+      PATH_CONFIG: /pcas/config
+      PATH_DATA: /pcas/data
+      HOMESERVER_NAME: synapse
+      HOMESERVER_URL: http://synapse:8008
+
+```
+Adjust/add settngs as needed.
+
+`docker compose up` starts the devel version with /config and /data from project root
+
+### Run from mxtest
+
+`cd mxtest`
+
+`./fullstack.sh`
+
+This set up a synapse and attaches the devel version to it with data from data/pcas/config and data/pcas/data
+
+Adjust settings in pcas.override.yaml.

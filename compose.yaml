@@ -1,0 +1,44 @@
+services:
+  pcas-npm-install:
+    image: docker.io/library/node:21
+    working_dir: /pcas
+    volumes:
+      - .:/pcas
+    command: npm install
+    user: "${MXTEST_UID}:${MXTEST_GID}"
+
+  pcas-bun-install:
+    image: docker.io/oven/bun:latest
+    working_dir: /pcas
+    volumes:
+      - .:/pcas
+    command: bun install
+    user: "${MXTEST_UID}:${MXTEST_GID}"
+    depends_on:
+      pcas-npm-install:
+        condition: service_completed_successfully
+        restart: true
+
+  pcas-sdk-test:
+    image: docker.io/oven/bun:latest
+    working_dir: /pcas
+    volumes:
+      - .:/pcas
+    command: bun test-sdk.ts
+    user: "${MXTEST_UID}:${MXTEST_GID}"
+    depends_on:
+      pcas-bun-install:
+        condition: service_completed_successfully
+        restart: true
+
+  pcas-dev:
+    image: docker.io/oven/bun:latest
+    working_dir: /pcas
+    volumes:
+      - .:/pcas
+    command: bun --watch run src/index.ts
+    user: "${MXTEST_UID}:${MXTEST_GID}"
+    depends_on:
+      pcas-sdk-test:
+        condition: service_completed_successfully
+        restart: true
