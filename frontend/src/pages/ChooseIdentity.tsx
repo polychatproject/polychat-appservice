@@ -26,7 +26,7 @@ export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMesseng
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | undefined>();
     const [file, setFile] = useState<File>();
-    const [identity, setIdentity] = useState('inherit');
+    const [identity, setIdentity] = useState(Bun.env.UNSTABLE_FEATURES ? 'inherit' : 'custom');
     const [name, setName] = useState('');
     const [loading, polychatDataError, polychatData] = usePolychatData(polychatId);
     const network = networks[networkId];
@@ -94,7 +94,7 @@ export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMesseng
             <form
                 onSubmit={handleSubmit}
             >
-                <FormControl>
+                {Bun.env.UNSTABLE_FEATURES && <FormControl>
                     <RadioGroup
                         value={identity}
                         name="identity"
@@ -103,11 +103,11 @@ export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMesseng
                         <FormControlLabel value="inherit" control={<Radio />} label={`Use name and picture from my ${network.name} profile`} />
                         <FormControlLabel value="custom" control={<Radio />} label="Set name and picture specifically for this chat" />
                     </RadioGroup>
-                </FormControl>
+                </FormControl>}
 
                 {identity === 'custom' && (
                     <ListItem disablePadding>
-                        <ListItemAvatar>
+                        {Bun.env.UNSTABLE_FEATURES && <ListItemAvatar>
                             <Avatar>
                                 <FileUpload />
                                 <input
@@ -120,7 +120,7 @@ export function ChooseIdentity({ polychatId, isAdmin, networkId }: ChooseMesseng
                                     }}
                                 />
                             </Avatar>
-                        </ListItemAvatar>
+                        </ListItemAvatar>}
                         <TextField
                             required
                             fullWidth
