@@ -1,4 +1,4 @@
-FROM node:21 AS build-backend
+FROM node:24 AS build-backend
 
 # Install app dependencies
 WORKDIR "/app"
