@@ -1,7 +1,8 @@
-import path from 'node:path';
 import { Router } from 'express';
-import { claimSubRoom, createPolychat, findMainRoom, getEnabledNetworks } from '..';
 import multer from 'multer';
+import path from 'node:path';
+import process from "node:process";
+import { claimSubRoom, createPolychat, findMainRoom, getEnabledNetworks } from '..';
 import { PATH_DATA } from '../env';
 import { logger } from '../logger';
 

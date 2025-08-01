@@ -1,7 +1,8 @@
-import fsPromises from 'node:fs/promises';
-import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
+import process from "node:process";
 import { PATH_DATA } from '../env';
 import { logger } from '../logger';
 import { findMainRoom } from '..';
@@ -21,9 +22,9 @@ const api = express();
 // https://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 api.disable('x-powered-by');
 
-const allowCrossDomain = function (req: any, res: any, next: any) {
+const allowCrossDomain = (_req: express.Request, res: express.Response, next: () => void) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Credentials', true);
+    res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'POST');
     res.header("Access-Control-Allow-Headers", 'Origin, X-Requested-With, Content-Type, Accept');
     next();
