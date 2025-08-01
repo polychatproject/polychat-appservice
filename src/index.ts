@@ -308,7 +308,7 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
         const displayName = await getDisplayNameForPolychat(polychat, subRoom, user);
         await ensureDisplayNameInRoom(polychat.mainRoomId, user.localpartInMainRoom, displayName);
     } catch (err) {
-        log.error(`Failed to update Display Name of ${user.localpartInMainRoom} in main room ${polychat.mainRoomId}`);
+        log.error({ err }, `Failed to update Display Name of ${user.localpartInMainRoom} in main room ${polychat.mainRoomId}`);
     }
     log.debug({event_content: event.content}, 'onMessageInSubRoom content');
 
@@ -492,7 +492,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         unclaimedSubRooms.get('irc')!.push(room);
 
         // TODO: Wait for join, then set up link
-        setTimeout(async () => {
+        setTimeout(() => {
             log3.info({ room_id: roomId }, `Send "!plumb" command to ${roomId}`);
             try {
                 intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
@@ -529,7 +529,6 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 },
             ],
         });
-        const log3 = log2.child({ room_id: roomId });
         if (DEBUG_MXID) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
@@ -866,8 +865,6 @@ const onMessage = async (roomId: string, event: any): Promise<void> => {
 
     // TODO: Keep a list of Control Rooms instead of implying that every other room is a Control Room.
     return onMessageInControlRoom(roomId, event);
-
-    log.info(`Didn't know what to do with event in ${roomId}`);
 };
 
 // Attach listeners here
