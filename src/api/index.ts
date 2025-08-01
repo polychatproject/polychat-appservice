@@ -1,20 +1,14 @@
 import express from 'express';
-import multer from 'multer';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import process from "node:process";
 import { PATH_DATA } from '../env';
-import { logger } from '../logger';
 import { findMainRoom } from '..';
 import api202401 from './2024-01';
 import api202401debug from './2024-01-debug';
 
-const log = logger.child({ name: 'api' });
-
 const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
 const API_JOIN_BASE_URL = process.env.API_JOIN_BASE_URL || 'https://join.polychat.de';
-
-const upload = multer({ dest: PATH_UPLOADS });
 
 const api = express();
 
