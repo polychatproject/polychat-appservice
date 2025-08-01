@@ -3,3 +3,7 @@
 /data
 /config
 /mxtest
+/.git
+/compose.yaml
+/CONTRIBUTING.md
+/makeenv.sh

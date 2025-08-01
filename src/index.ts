@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import * as path from 'node:path';
+import process from "node:process";
 import {
     Appservice,
     LogService,
@@ -307,7 +308,7 @@ const onMessageInClaimedSubRoom = async (subRoom: ClaimedSubRoom, polychat: Poly
         const displayName = await getDisplayNameForPolychat(polychat, subRoom, user);
         await ensureDisplayNameInRoom(polychat.mainRoomId, user.localpartInMainRoom, displayName);
     } catch (err) {
-        log.error(`Failed to update Display Name of ${user.localpartInMainRoom} in main room ${polychat.mainRoomId}`);
+        log.error({ err }, `Failed to update Display Name of ${user.localpartInMainRoom} in main room ${polychat.mainRoomId}`);
     }
     log.debug({event_content: event.content}, 'onMessageInSubRoom content');
 
@@ -491,7 +492,7 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
         unclaimedSubRooms.get('irc')!.push(room);
 
         // TODO: Wait for join, then set up link
-        setTimeout(async () => {
+        setTimeout(() => {
             log3.info({ room_id: roomId }, `Send "!plumb" command to ${roomId}`);
             try {
                 intent.underlyingClient.sendText(dmRoomId, `!plumb ${roomId} ${IRC_BRIDGE_SERVER} ${ircChannel}`);
@@ -528,7 +529,6 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 },
             ],
         });
-        const log3 = log2.child({ room_id: roomId });
         if (DEBUG_MXID) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
@@ -787,7 +787,7 @@ const onCreatePolychatMessageInControlRoom = async (roomId: string, event: any, 
     try {
         const polychat = await createPolychat({ name: roomName });
         await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `created ${polychat.mainRoomId}`);
-    } catch (err: any) {
+    } catch (err) {
         log.error({
             err,
             requested_room_name: roomName,
@@ -808,8 +808,14 @@ const onClaimPolychatMessageInControlRoom = async (roomId: string, event: any, m
         const network = match.groups!['network'] as Network; // TODO: unsafe type cast
         const url = await claimSubRoom(polychat, network);
         await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `Invite Url: ${url}`);
-    } catch (error: any) {
-        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${error.message}`);
+    } catch (err) {
+        let message = String(err);
+        if (err instanceof Error) {
+            message = `error ${err.message}`;
+        } else {
+            log.warn({err}, 'Unhandled error while replying to a room claim')
+        }
+        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${message}`);
     }
 };
 
@@ -859,8 +865,6 @@ const onMessage = async (roomId: string, event: any): Promise<void> => {
 
     // TODO: Keep a list of Control Rooms instead of implying that every other room is a Control Room.
     return onMessageInControlRoom(roomId, event);
-
-    log.info(`Didn't know what to do with event in ${roomId}`);
 };
 
 // Attach listeners here
@@ -921,7 +925,7 @@ const onEvent = async (roomId: string, event: any): Promise<void> => {
                     try {
                         await intent.underlyingClient.kickUser(mxid, roomId, 'This Polychat sub room is already in use by someone else.');
                     } catch (err) {
-                        log2.warn(`Failed to kick ${mxid} from the sub room ${roomId} which belongs to ${subRoomInfo.subRoom.userId}`);
+                        log2.warn({ err }, `Failed to kick ${mxid} from the sub room ${roomId} which belongs to ${subRoomInfo.subRoom.userId}`);
                         subRoomInfo.subRoom.lastDebugState = 'Another user joined the active room but we failed to kick them';
                     }
                     return;
@@ -1175,7 +1179,7 @@ async function main(): Promise<void> {
     // AppService
     // Typically appservices will want to autojoin all rooms
     AutojoinRoomsMixin.setupOnAppservice(appservice);
-    appservice.begin().then(async () => {
+    appservice.begin().then(() => {
         log.info(`AppService: Listening on ${APPSERVICE_BIND_ADDRESS}:${APPSERVICE_PORT}`);
         fillUpSubRoomPool();
         api.set('ready', true);

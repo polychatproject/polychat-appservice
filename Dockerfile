@@ -37,7 +37,7 @@ COPY --from=build-frontend /app/public/ public/
 
 # Make the build fail if @matrix-org/matrix-sdk-crypto-nodejs wasn't installed correctly.
 # error: Cannot find module "@matrix-org/matrix-sdk-crypto-nodejs" from "/home/bun/.bun/install/cache/matrix-bot-sdk@0.7.1/lib/e2ee/CryptoClient.js"
-RUN bun test-sdk.ts
+RUN bun tools/test-sdk.ts
 
 # API port
 EXPOSE 9998

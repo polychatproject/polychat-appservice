@@ -1,8 +1,9 @@
+import { ILogger } from 'matrix-bot-sdk';
 import fs from 'node:fs';
 import path from 'node:path';
+import process from "node:process";
 import pino, { Logger } from 'pino';
 import { PATH_CONFIG } from './env';
-import { ILogger } from 'matrix-bot-sdk';
 
 let options;
 let fileExists = true;
