@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import * as path from 'node:path';
-import process from 'node:process';
+import process from "node:process";
 import {
     Appservice,
     LogService,
@@ -788,7 +788,7 @@ const onCreatePolychatMessageInControlRoom = async (roomId: string, event: any, 
     try {
         const polychat = await createPolychat({ name: roomName });
         await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `created ${polychat.mainRoomId}`);
-    } catch (err: any) {
+    } catch (err) {
         log.error({
             err,
             requested_room_name: roomName,
@@ -809,8 +809,14 @@ const onClaimPolychatMessageInControlRoom = async (roomId: string, event: any, m
         const network = match.groups!['network'] as Network; // TODO: unsafe type cast
         const url = await claimSubRoom(polychat, network);
         await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `Invite Url: ${url}`);
-    } catch (error: any) {
-        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${error.message}`);
+    } catch (err) {
+        let message = String(err);
+        if (err instanceof Error) {
+            message = `error ${err.message}`;
+        } else {
+            log.warn({err}, 'Unhandled error while replying to a room claim')
+        }
+        await polychatIntent.underlyingClient.replyText(roomId, event.event_id, `error ${message}`);
     }
 };
 
