@@ -4,6 +4,6 @@
 
 import {
     MatrixClient,
-} from 'matrix-bot-sdk';
+} from '@vector-im/matrix-bot-sdk';
 
 const appservice = new MatrixClient('http://localhost', 'b');

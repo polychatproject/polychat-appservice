@@ -529,7 +529,6 @@ const createSubRoom = async (opts: {name?: string, network: Network}) => {
                 },
             ],
         });
-        const log3 = log2.child({ room_id: roomId });
         if (DEBUG_MXID) {
             await intent.underlyingClient.inviteUser(DEBUG_MXID, roomId);
             await intent.underlyingClient.setUserPowerLevel(DEBUG_MXID, roomId, 50);
@@ -866,8 +865,6 @@ const onMessage = async (roomId: string, event: any): Promise<void> => {
 
     // TODO: Keep a list of Control Rooms instead of implying that every other room is a Control Room.
     return onMessageInControlRoom(roomId, event);
-
-    log.info(`Didn't know what to do with event in ${roomId}`);
 };
 
 // Attach listeners here

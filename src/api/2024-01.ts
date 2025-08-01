@@ -17,7 +17,7 @@ const router = Router();
 /**
  * Create a new Polychat.
  */
-router.get('/settings', async (req, res) => {
+router.get('/settings', (_req, res) => {
     res.json({
         networks: getEnabledNetworks(),
     });

@@ -1,13 +1,10 @@
 import express from 'express';
 import fsPromises from 'node:fs/promises';
-import path from 'node:path';
 import process from "node:process";
-import { PATH_DATA } from '../env';
 import { findMainRoom } from '..';
 import api202401 from './2024-01';
 import api202401debug from './2024-01-debug';
 
-const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
 const API_JOIN_BASE_URL = process.env.API_JOIN_BASE_URL || 'https://join.polychat.de';
 
 const api = express();
@@ -23,8 +20,6 @@ const allowCrossDomain = (_req: express.Request, res: express.Response, next: ()
     res.header("Access-Control-Allow-Headers", 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 };
-
-// api.use('/api/', express.static(PATH_UPLOADS));
 
 api.use('/api/2024-01', allowCrossDomain, api202401);
 api.use('/api/2024-01-debug', allowCrossDomain, api202401debug);
