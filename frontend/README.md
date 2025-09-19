@@ -2,9 +2,9 @@
 
 ## Build
 
-The webapp with bundled JavaScript libraries will be put into the folder `out`.
-
 ```bash
 bun install
 bun run build
 ```
+
+By default, the output folder is `../public`.
