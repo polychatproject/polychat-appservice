@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import process from 'node:process';
 import pino, { Logger } from 'pino';
 import { PATH_CONFIG } from './env';
 import { ILogger } from 'matrix-bot-sdk';
@@ -9,8 +10,8 @@ let fileExists = true;
 try {
     const data = fs.readFileSync(path.join(PATH_CONFIG, 'pino.json'), 'utf8');
     options = JSON.parse(data);
-} catch (err: any) {
-    if (err.code !== 'ENOENT') {
+} catch (err) {
+    if (err instanceof Error && 'code' in err && err.code !== 'ENOENT') {
         console.error(err);
         process.exit(1);
     }

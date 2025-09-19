@@ -89,9 +89,9 @@ export function CreatePolychat(props: { }) {
         window.location.href = `#qrpage/${data.id}`;
     }, [groupName, readableAddress, file]);
 
-    const handleReadableAddressChange = useCallback((event) => {
-        setReadableAddress(event.target.value);
-    }, []);
+    // const handleReadableAddressChange = useCallback((event) => {
+    //     setReadableAddress(event.target.value);
+    // }, []);
 
     const handleFileClick: MouseEventHandler<HTMLInputElement> = useCallback((event) => {
         event.preventDefault();

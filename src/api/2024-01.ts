@@ -1,4 +1,5 @@
 import path from 'node:path';
+import process from 'node:process';
 import { Router } from 'express';
 import { claimSubRoom, createPolychat, findMainRoom, getEnabledNetworks } from '..';
 import multer from 'multer';

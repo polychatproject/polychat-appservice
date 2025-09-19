@@ -1,5 +1,6 @@
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import process from 'node:process';
 import express from 'express';
 import multer from 'multer';
 import { PATH_DATA } from '../env';
@@ -21,7 +22,7 @@ const api = express();
 // https://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 api.disable('x-powered-by');
 
-const allowCrossDomain = function (req: any, res: any, next: any) {
+const allowCrossDomain = function (_req: any, res: any, next: any) {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Credentials', true);
     res.header('Access-Control-Allow-Methods', 'POST');
@@ -36,7 +37,7 @@ api.use('/api/2024-01-debug', allowCrossDomain, api202401debug);
 
 /* START METRICS AND KUBERNETES */
 
-api.get('/livez', (req, res) => {
+api.get('/livez', (_req, res) => {
     if (api.get('live')) {
         res.end('OK');
     } else {
@@ -44,7 +45,7 @@ api.get('/livez', (req, res) => {
     }
 });
 
-api.get('/readyz', (req, res) => {
+api.get('/readyz', (_req, res) => {
     if (api.get('ready')) {
         res.end('OK');
     } else {
@@ -54,7 +55,7 @@ api.get('/readyz', (req, res) => {
 
 /* START WEBSITE */
 
-api.get('/index.js', async (req, res) => {
+api.get('/index.js', async (_req, res) => {
     let text = await fsPromises.readFile('./public/index.js', 'utf-8');
     if (API_JOIN_BASE_URL !== 'https://join.polychat.de') {
         text = text.replace(/https:\/\/join\.polychat\.de/g, API_JOIN_BASE_URL);

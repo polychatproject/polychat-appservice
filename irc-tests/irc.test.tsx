@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createWriteStream, WriteStream } from 'node:fs';
 import * as fsPromise from 'node:fs/promises';
 import * as path from 'node:path';
+import process from 'node:process';
 
 const PATH_II = process.env.PATH_II_SERVER || '/home/jaller94/Git2/polychat/PolyChat-LocalDeployment/mxtest/data/debian-pcc/irc/inspircd';
 
