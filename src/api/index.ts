@@ -1,20 +1,11 @@
-import fsPromises from 'node:fs/promises';
-import path from 'node:path';
-import process from 'node:process';
 import express from 'express';
-import multer from 'multer';
-import { PATH_DATA } from '../env';
-import { logger } from '../logger';
+import fsPromises from 'node:fs/promises';
+import process from "node:process";
 import { findMainRoom } from '..';
 import api202401 from './2024-01';
 import api202401debug from './2024-01-debug';
 
-const log = logger.child({ name: 'api' });
-
-const PATH_UPLOADS = process.env.PATH_UPLOADS || path.join(PATH_DATA, './uploads');
 const API_JOIN_BASE_URL = process.env.API_JOIN_BASE_URL || 'https://join.polychat.de';
-
-const upload = multer({ dest: PATH_UPLOADS });
 
 const api = express();
 
@@ -22,15 +13,13 @@ const api = express();
 // https://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 api.disable('x-powered-by');
 
-const allowCrossDomain = function (_req: any, res: any, next: any) {
+const allowCrossDomain = (_req: express.Request, res: express.Response, next: () => void) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Credentials', true);
+    res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'POST');
     res.header("Access-Control-Allow-Headers", 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 };
-
-// api.use('/api/', express.static(PATH_UPLOADS));
 
 api.use('/api/2024-01', allowCrossDomain, api202401);
 api.use('/api/2024-01-debug', allowCrossDomain, api202401debug);
