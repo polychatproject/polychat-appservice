@@ -1,0 +1,50 @@
+# Trigger an OpenShift Image Build on the polychat ESS cluster.
+#
+# The actual build runs inside the cluster (BuildConfig
+# `polychat-appservice-main` in the `dtn10-customer-polychat` namespace),
+# pushes to the internal registry as `polychat-appservice:main`, and the
+# StatefulSet auto-rolls via an `image.openshift.io/triggers` annotation.
+#
+# Required repo secret:
+#   OPENSHIFT_BUILD_WEBHOOK_URL — the BuildConfig's GitHub webhook URL,
+#   including the secret token. Get it from a logged-in `oc` with:
+#     oc describe bc/polychat-appservice-main -n dtn10-customer-polychat
+#   The URL has the form
+#     https://api.astra.dtn10.de:6443/apis/build.openshift.io/v1/namespaces/dtn10-customer-polychat/buildconfigs/polychat-appservice-main/webhooks/<secret>/github
+
+name: OpenShift Build (polychat ESS cluster)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-openshift-build:
+    name: Notify OpenShift BuildConfig
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST GitHub-style webhook to OpenShift
+        env:
+          WEBHOOK_URL: ${{ secrets.OPENSHIFT_BUILD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "::error::OPENSHIFT_BUILD_WEBHOOK_URL secret is not set"
+            exit 1
+          fi
+
+          payload=$(jq -nc \
+            --arg ref "${{ github.ref }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg repo "${{ github.repository }}" \
+            '{ref: $ref, after: $sha, repository: {full_name: $repo}}')
+
+          response=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -d "$payload")
+
+          echo "HTTP $response"
+          jq . /tmp/resp.json 2>/dev/null || cat /tmp/resp.json
+          test "$response" = "200" -o "$response" = "201"
