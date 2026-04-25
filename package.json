@@ -17,8 +17,8 @@
   "dependencies": {
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
+    "@vector-im/matrix-bot-sdk": "^0.8.0-element.3",
     "express": "^5.1.0",
-    "matrix-bot-sdk": "^0.7.1",
     "multer": "^2.0.2",
     "pino": "^9.10.0",
     "yaml": "^2.8.1"

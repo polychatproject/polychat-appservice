@@ -9,7 +9,7 @@ import {
     SimpleRetryJoinStrategy,
     AutojoinRoomsMixin,
     MatrixClient,
-} from 'matrix-bot-sdk';
+} from '@vector-im/matrix-bot-sdk';
 import { parse as parseYAML } from 'yaml';
 import api from './api';
 import { LoggerForMatrixBotSdk, logger } from './logger';
